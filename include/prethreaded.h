@@ -1,0 +1,8 @@
+#ifndef PROYECTO2_PRETHREADED_H
+#define PROYECTO2_PRETHREADED_H
+
+#include "utils.h"
+
+
+
+#endif //PROYECTO2_PRETHREADED_H
