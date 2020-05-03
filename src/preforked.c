@@ -251,7 +251,7 @@ httpRequest parseRequest(char *msg, char *rootdir)
         ret.returncode = 400;
         ret.filename = "400.html";
         ret.contentType = "text/html";
-        fprintf(stderr, "HTTP/1.1 400 Bad Request (%s)\n", filename);
+        fprintf(stderr, "[%i] 400 Bad Request (%s)\n", getpid(), filename);
     }
 
     // If they asked for / return index.html
@@ -261,7 +261,7 @@ httpRequest parseRequest(char *msg, char *rootdir)
         ret.returncode = 404;   //200
         ret.filename = "404.html";  //index.html
         ret.contentType = "text/html";
-        fprintf(stderr, "HTTP/1.1 404 Not Found (%s)\n", filename);
+        fprintf(stderr, "[%i] 404 Not Found (%s)\n", getpid(), filename);   
     }
 
     // If they asked for a specific page and it exists because we opened it sucessfully return it 
@@ -272,7 +272,6 @@ httpRequest parseRequest(char *msg, char *rootdir)
         ret.contentType = contentType;
         // Close the file stream
         fclose(exists);
-        fprintf(stderr, "HTTP/1.1 200 OK (%s)\n", filename);
     }
 
     // If we get here the file they want doesn't exist so return a 404
@@ -281,15 +280,14 @@ httpRequest parseRequest(char *msg, char *rootdir)
         ret.returncode = 404;
         ret.filename = "404.html";
         ret.contentType = "text/html";
-        fprintf(stderr, "HTTP/1.1 404 Not Found (%s)\n", filename);
+        fprintf(stderr, "[%i] 404 Not Found (%s)\n", getpid(), filename);
     }
 
     // Return the structure containing the details
     return ret;
 }
 
-// print a file out to a socket file descriptor
-int printFile(int fd, char *filename)
+int writeFile(int fd, char *filename)
 {
     if ((strcmp("404.html", filename) == 0) || (strcmp("400.html", filename) == 0))
     {
@@ -335,7 +333,7 @@ int printFile(int fd, char *filename)
     return totalsize;
 }
 
-int printHeader(int fd, int returncode, char *filename, char *contentType)
+int writeHeader(int fd, int returncode, char *filename, char *contentType)
 {
     char responseheader[120];
     int filesize = getFileSize(filename);
@@ -349,8 +347,8 @@ int printHeader(int fd, int returncode, char *filename, char *contentType)
                 "Server: PreForkedServer\r\n"
                 "Content-Length: %d\r\n"
                 "Content-Type: %s\r\n\r\n", filesize, contentType);
-            //fprintf(stderr, "Filename = %s\n", filename);
             //fprintf(stderr, "Header = %s\n", responseheader);
+            fprintf(stderr, "[%i] 200 OK (%s)\n", getpid(), filename);
             sendMessage(fd, responseheader);
             return strlen(responseheader);
             break;

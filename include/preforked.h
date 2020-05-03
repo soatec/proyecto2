@@ -26,9 +26,9 @@ char* getContentType(char* msg);
 // parse a HTTP request and return an object with return code and filename
 httpRequest parseRequest(char* msg, char* rootdir);
 
-// print a file out to a socket file descriptor
-int printFile(int fd, char *filename);
+// write a file out to a socket file descriptor
+int writeFile(int fd, char *filename);
 
-int printHeader(int fd, int returncode, char* filename, char* contentType);
+int writeHeader(int fd, int returncode, char* filename, char* contentType);
 
 #endif //PROYECTO2_PREFORKED_H

@@ -261,6 +261,8 @@ int main(int argc, char *argv[])
             }
 
             wait(NULL);
+            totaldata = recordTotalBytes(0, mempointer);
+            fprintf(stderr,"Total bytes sent %d\n", totaldata);
             fprintf(stderr, "Parent ");
             cleanup(2);
             break;
@@ -307,16 +309,16 @@ int main(int argc, char *argv[])
                 free(header);
 
                 // Print out the correct header
-                headersize = printHeader(conn_s, details.returncode, details.filename, details.contentType);
+                headersize = writeHeader(conn_s, details.returncode, details.filename, details.contentType);
 
                 // Print out the file they wanted
-                pagesize = printFile(conn_s, details.filename);
+                pagesize = writeFile(conn_s, details.filename);
 
                 // Increment our count of total datasent by all processes and get back the new total
                 totaldata = recordTotalBytes(headersize + pagesize, mempointer);
 
                 // Print out which process handled the request and how much data was sent
-                printf("Process %d served a request of %d bytes. Total bytes sent %d  \n", getpid(), headersize + pagesize, totaldata);
+                printf("[%d] served a request of %d bytes\n", getpid(), headersize + pagesize);
 
                 // Close the connection now were done
                 close(conn_s);
