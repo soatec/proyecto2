@@ -19,12 +19,12 @@ char *getMessage(int fd);
 int sendMessage(int fd, char *msg);
 
 // Extracts the filename needed from a GET request and adds public_html to the front of it
-char* getFileName(char* msg);
+char* getFileName(char* msg, char* rootdir);
 
 char* getContentType(char* msg);
 
 // parse a HTTP request and return an object with return code and filename
-httpRequest parseRequest(char *msg);
+httpRequest parseRequest(char* msg, char* rootdir);
 
 // print a file out to a socket file descriptor
 int printFile(int fd, char *filename);
