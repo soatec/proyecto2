@@ -21,10 +21,13 @@
 
 #include "preforked.h"
 
+#define SERVER_BACKLOG 100
+
 
 // Structure to hold variables that will be placed in shared memory
 typedef struct {
     pthread_mutex_t mutexlock;
+    pthread_mutex_t accept_connection_lock;
     int totalbytes;
 } sharedVariables;
 
@@ -192,7 +195,7 @@ int main(int argc, char *argv[])
     }
 
     // Listen on socket list_s
-    if ((listen(list_s, 10)) == -1)
+    if ((listen(list_s, SERVER_BACKLOG)) == -1)
     {
         fprintf(stderr, "Error Listening\n");
         exit(EXIT_FAILURE);
@@ -230,6 +233,7 @@ int main(int argc, char *argv[])
 
     // Initalise the mutex
     pthread_mutex_init(&(*mempointer).mutexlock, NULL);
+    pthread_mutex_init(&(*mempointer).accept_connection_lock, NULL);
     // Set total bytes sent to 0
     (*mempointer).totalbytes = 0;
 
@@ -290,7 +294,9 @@ int main(int argc, char *argv[])
             while (1)
             {
                 // Accept a connection
+                pthread_mutex_lock(&(*mempointer).accept_connection_lock);
                 conn_s = accept(list_s, (struct sockaddr *) &servaddr, &addr_size);
+                pthread_mutex_unlock(&(*mempointer).accept_connection_lock);
 
                 // If something went wrong with accepting the connection deal with it
                 if (conn_s == -1)
