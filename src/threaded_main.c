@@ -34,10 +34,9 @@ typedef struct {
 typedef struct{
     int connfd_thread;
     char *root;
-} threadConnFd;
+} threadInfo;
 
 int list_s;
-static char* static_root = NULL;
 
 // Increment the global count of data sent out 
 int recordTotalBytes(int bytes_sent, sharedVariables *mempointer)
@@ -86,6 +85,35 @@ int mygetch(void)
     return ch;
 }
 
+void* connection(void *p){
+
+
+
+    // Sizes of data were sending out
+    int headersize;
+    int pagesize;
+
+    threadInfo *info = (threadInfo*)p;
+
+    int connfd_thread = info->connfd_thread;
+
+    char *header = getMessage(connfd_thread);
+
+    httpRequest details = parseRequest(header, info->root);
+
+    free(header);
+
+    headersize = writeHeader(connfd_thread, details.returncode, details.filename, details.contentType);
+
+    pagesize = writeFile(connfd_thread, details.filename);
+
+    printf("[%d] served a request of %d bytes\n", getpid(), headersize + pagesize);
+
+    close(connfd_thread);
+    pthread_exit(NULL);
+
+}
+
 int main(int argc, char *argv[]) {
   int   opt;
   char *root    = NULL;
@@ -126,9 +154,6 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    strcpy(static_root, root);
-
-
   if (puerto == -1) {
       fprintf(stderr, "-p puerto es un parámetro obligatorio\n");
       return EXIT_FAILURE;
@@ -150,8 +175,6 @@ int main(int argc, char *argv[]) {
   printf("%s ejecutando con el root path %s en el puerto %d\n",argv[0], root,
          puerto);
 
-
-    int conn_s; //  connection socket
     short int port = puerto;  //  port number
     struct sockaddr_in servaddr;  //  socket address structure
 
@@ -220,8 +243,7 @@ int main(int argc, char *argv[]) {
 
     
 
-    int sfd;
-    int connfd[100];
+    threadInfo connfd[100];  //  connection socket
     pthread_t threads[100];
     int thread_count = 0;
 
@@ -232,15 +254,21 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "Error Listening\n");
             exit(EXIT_FAILURE);
         }
+        connfd[thread_count].root = malloc(strlen(root));
+        strcpy(connfd[thread_count].root, root); 
+        printf("Waiting for a request \n");
 
         pthread_mutex_lock(&(*mempointer).accept_connection_lock);
-        connfd[thread_count] =  accept(list_s, (struct sockaddr *) &servaddr, &addr_size);
+        connfd[thread_count].connfd_thread =  accept(list_s, (struct sockaddr *) &servaddr, &addr_size);
         pthread_mutex_unlock(&(*mempointer).accept_connection_lock);
 
-        if(connfd[thread_count] < 0){
+        if(connfd[thread_count].connfd_thread < 0){
             fprintf(stderr, "Error accepting connection \n");
             exit(1);
         }
+
+        //printf("%d \n", connfd[thread_count].connfd_thread);
+        //printf("%s \n", connfd[thread_count].root);
 
         pthread_create(&threads[thread_count], NULL, connection, &connfd[thread_count]);
         pthread_join(threads[thread_count], NULL);
@@ -248,31 +276,4 @@ int main(int argc, char *argv[]) {
     }
 
   return EXIT_SUCCESS;
-}
-
-void *connection(void *p){
-
-    // Sizes of data were sending out
-    int headersize;
-    int pagesize;
-    int totaldata;
-
-
-    int *connfd_thread = (int *)p;
-
-    char *header = getMessage(*connfd_thread);
-
-    httpRequest details = parseRequest(header, static_root);
-
-    free(header);
-
-    headersize = writeHeader(*connfd_thread, details.returncode, details.filename, details.contentType);
-
-    pagesize = writeFile(*connfd_thread, details.filename);
-
-    printf("[%d] served a request of %d bytes\n", getpid(), headersize + pagesize);
-
-    close(*connfd_thread);
-    pthread_exit(NULL);
-
 }
