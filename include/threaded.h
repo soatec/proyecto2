@@ -3,6 +3,7 @@
 
 #include "utils.h"
 
-
+//handle threads to make the work
+void *connection(void *p);
 
 #endif //PROYECTO2_THREADED_H
