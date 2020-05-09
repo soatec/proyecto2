@@ -3,6 +3,6 @@
 
 #include "utils.h"
 
-
+int execute_forked_server(int port_int, char *root);
 
 #endif //PROYECTO2_FORKED_H
