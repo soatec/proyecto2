@@ -70,7 +70,7 @@ void cleanup(int sig)
     exit(EXIT_SUCCESS);
 }
 
-int mygetch(void)
+int my_get_char(void)
 {
     int ch;
     struct termios oldt, newt;
@@ -239,9 +239,7 @@ int main(int argc, char *argv[]) {
     (*mempointer).totalbytes = 0;
 
     // Size of the address
-    int addr_size = sizeof(servaddr);
-
-    
+    socklen_t addr_size = sizeof(servaddr);
 
     threadInfo connfd[100];  //  connection socket
     pthread_t threads[100];
