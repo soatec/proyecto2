@@ -76,7 +76,7 @@ char *get_content_type(char *file_path) {
 
 int write_header(int file_descriptor, int return_code, char *file_name, char *server_name){
     char response_header[120];
-    int file_size;
+    int file_size = 0;
     switch (return_code) {
         case 200:
             file_size = get_file_size(file_name);
@@ -112,11 +112,12 @@ int write_header(int file_descriptor, int return_code, char *file_name, char *se
     }
     write(file_descriptor, response_header, strlen(response_header));
     printf("Header enviado:\n\n%sFin del header\n", response_header);
-    return (int)strlen(response_header);
+    return (int)strlen(response_header) + file_size;
 }
 
-void respond_to_get_request(char *root, int file_descriptor,
+int respond_to_get_request(char *root, int file_descriptor,
         char *requested_resource_path, char *server_name) {
+    int response_size = 0;
     char path[PATH_MAX];
     int requested_file_descriptor;
     int bytes_read;
@@ -131,7 +132,7 @@ void respond_to_get_request(char *root, int file_descriptor,
     requested_file_descriptor = open(path, O_RDONLY);
     if (requested_file_descriptor != -1) {
         printf("Archivo encontrado\n");
-        write_header(file_descriptor, 200, path, server_name);
+        response_size = write_header(file_descriptor, 200, path, server_name);
         while ((bytes_read=read(requested_file_descriptor, data_to_send, WRITE_BUFFER_SIZE)) > 0){
             if (bytes_read < 0) {
                 fprintf(stderr, "Error en la función read. (Errno %d: %s)\n",
@@ -142,8 +143,9 @@ void respond_to_get_request(char *root, int file_descriptor,
         }
     } else {
         printf("Archivo no encontrado\n");
-        write_header(file_descriptor, 404, NULL, server_name);
+        response_size = write_header(file_descriptor, 404, NULL, server_name);
     }
+    return response_size;
 }
 
 void respond_to_put_request(char *root, int file_descriptor,
@@ -160,7 +162,8 @@ void respond_to_not_supported_request(int file_descriptor, char *server_name) {
     write_header(file_descriptor, 501, NULL, server_name);
 }
 
-void respond_to_request(char *root, int file_descriptor, char *server_name) {
+int respond_to_request(char *root, int file_descriptor, char *server_name) {
+    int response_size = 0;
     char mesg[READ_BUFFER_SIZE];
     // A request line has three parts, separated by spaces: a method name,
     // the local path of the requested resource, and the version of HTTP being used
@@ -174,12 +177,12 @@ void respond_to_request(char *root, int file_descriptor, char *server_name) {
     if (recv_responde < 0) {
         fprintf(stderr, ("Error al recibir el mensaje\n"));
         close_connection(file_descriptor);
-        return;
+        return response_size;
     }
     if (recv_responde == 0) {
         fprintf(stderr, "El cliente se desconectó\n");
         close_connection(file_descriptor);
-        return;
+        return response_size;
     }
     printf("Mensaje:\n\n%sFin del mensaje\n", mesg);
     method_name = strtok(mesg, " \t\n");
@@ -189,11 +192,11 @@ void respond_to_request(char *root, int file_descriptor, char *server_name) {
     if (strncmp(http_version, "HTTP/1.1", 8) != 0) {
         write_header(file_descriptor, 400, NULL, server_name);
         close_connection(file_descriptor);
-        return;
+        return response_size;
     }
     
     if (strncmp(method_name, "GET\0", 4) == 0) {
-        respond_to_get_request(root, file_descriptor, requested_resource_path, server_name);
+        response_size = respond_to_get_request(root, file_descriptor, requested_resource_path, server_name);
     } else if (strncmp(method_name, "PUT\0", 4) == 0) {
         respond_to_put_request(root, file_descriptor, requested_resource_path, server_name);
     } else if (strncmp(method_name, "DELETE\0", 4) == 0) {
@@ -201,6 +204,9 @@ void respond_to_request(char *root, int file_descriptor, char *server_name) {
     } else {
         respond_to_not_supported_request(file_descriptor, server_name);
     }
+
     close_connection(file_descriptor);
+    printf("Process with PID %d, served %d bytes\n", getpid(), response_size);
+    return response_size;
 }
 

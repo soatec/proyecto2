@@ -91,7 +91,8 @@ int execute_forked_server(int port_int, char *root){
             printf("Un nuevo proceso se ha creado para atender a %s. PID: %d\n",
                    inet_ntoa(client_address.sin_addr), getpid());
             respond_to_request(root, accept_response, SERVER_NAME);
-            printf("Terminando proceso que atendió a %s\n", inet_ntoa(client_address.sin_addr));
+            printf("Terminando proceso que atendió a %s con PID %d\n",
+                    inet_ntoa(client_address.sin_addr), getpid());
             exit(EXIT_SUCCESS);
         }
 
