@@ -2,17 +2,21 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <arpa/inet.h>
 #include "prethreaded.h"
 
 int main(int argc, char *argv[]) {
+  int status;
   int   opt;
   char *root    = NULL;
   int   puerto  = -1;
   int   threads = -1;
+  servidor_prethreaded_t servidor;
 
   while ((opt = getopt(argc, argv, "p:r:n:")) != -1) {
       switch (opt) {
           case 'p':
+              // Rango de puertos válidos 1025-
               puerto = atoi(optarg);
               break;
           case 'r':
@@ -59,8 +63,21 @@ int main(int argc, char *argv[]) {
   printf(" \\$$    $$ \\$$     \\| $$         \\$$$   | $$ \\$$    $$ \\$$    $$| $$            | $$      | $$       \\$$     \\  \\$$  $$| $$  | $$| $$       \\$$     \\ \\$$    $$ \\$$    $$ \\$$     \\ \\$$    $$\n");
   printf("  \\$$$$$$   \\$$$$$$$ \\$$          \\$     \\$$  \\$$$$$$$  \\$$$$$$  \\$$             \\$$       \\$$        \\$$$$$$$   \\$$$$  \\$$   \\$$ \\$$        \\$$$$$$$  \\$$$$$$$  \\$$$$$$$  \\$$$$$$$  \\$$$$$$$\n\n");
 
+  status = prethreaded_server_init((uint16_t)puerto, threads, &servidor);
+  if(status) return status;
+
   printf("%s ejecutando con un máximo de %d threads con el root path %s "
-         "en el puerto %d\n",argv[0], threads, root, puerto);
+         "en el puerto %d de la máquina IP %s\n",argv[0], threads, root, puerto,
+          inet_ntoa(servidor.address.sin_addr));
+
+  status = prethreaded_server_run(servidor);
+  if (status) return status;
+
+  fprintf(stdout, "%s\n", "Press any key to exit");
+  getchar();
+
+  status = prethreaded_server_uninit(servidor);
+  if (status) return status;
 
   return EXIT_SUCCESS;
 }
