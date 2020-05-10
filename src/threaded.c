@@ -22,7 +22,6 @@
 #include <signal.h>           // signal handling
 #include <sys/mman.h>         // mmap library
 
-#include "preforked.h"
 #include "utils.h"
 
 
@@ -32,7 +31,7 @@ typedef struct {
 } extn;
 
 //Possible media types
-extn extensions[] ={
+extn exts[] ={
     {"gif", "image/gif" },
     {"txt", "text/plain" },
     {"jpg", "image/jpg" },
@@ -181,11 +180,11 @@ char *getContentType(char *msg)
     if (ext != NULL)
     {
         int i;
-        for (i = 0; extensions[i].ext != NULL; i++)
+        for (i = 0; exts[i].ext != NULL; i++)
         {
-            if (strcmp(ext + 1, extensions[i].ext) == 0)
+            if (strcmp(ext + 1, exts[i].ext) == 0)
             {
-                strcpy(base, extensions[i].mediatype);
+                strcpy(base, exts[i].mediatype);
                 free(file);
                 return base;
             }
@@ -304,8 +303,8 @@ int writeFile(int fd, char *filename)
     /*Open the file filename and echo the contents from it to the file descriptor fd */
 
     // Attempt to open the file 
-    FILE * read;
-    if ((read = open(filename, O_RDONLY, 0)) == NULL)
+    int read;
+    if ((read = open(filename, O_RDONLY, 0)) < 0)
     {
         fprintf(stderr, "Error opening file in printFile()\n");
         exit(EXIT_FAILURE);

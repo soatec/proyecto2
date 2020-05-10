@@ -19,7 +19,7 @@ typedef enum http_method {
 
   HTTP_METHOD_NOT_SUPPORTED,
 
-} http_request_t;
+} http_method_t;
 
 /**
  * Información del request HTTP
@@ -27,7 +27,7 @@ typedef enum http_method {
 typedef struct http_request {
 
   /** Método HTTP */
-  http_method_t metodo;
+  enum http_method metodo;
 
   /** URI */
   char *uri;

@@ -20,7 +20,8 @@
 /*
  * Parse HTTP request
  */
-hhtp_request_t parse_request(int fd) {
+http_request_t parse_request(int fd) {
+  http_request_t ret;
   FILE *file_stream = fdopen(fd, "r");
 
   if (file_stream == NULL)
@@ -28,6 +29,7 @@ hhtp_request_t parse_request(int fd) {
       fprintf(stderr, "Error opening file descriptor in getMessage()\n");
       exit(EXIT_FAILURE);
   }
+  return ret;
 }
 
 /*
