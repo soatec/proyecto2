@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <arpa/inet.h>
 #include <sys/socket.h>
 #include "prethreaded.h"
 #include "utils.h"
@@ -13,15 +14,10 @@
 #define BUFFER_LENGTH 8192
 
 /*
- * Tamaño de la cola de espera del servidor
- */
-#define CONNECTIONS_QUEUE_LEN 1000
-
-/*
  * Parse HTTP request
  */
 http_request_t parse_request(int fd) {
-  http_request_t ret;
+  http_request_t ret = {};
   FILE *file_stream = fdopen(fd, "r");
 
   if (file_stream == NULL)
@@ -109,56 +105,33 @@ int prethreaded_server_init(uint16_t puerto,
                             uint32_t cantidad_threads,
                             servidor_prethreaded_t *servidor) {
   int status;
-  int fd;
-  struct sockaddr_in address;
 
-  // Crear socket TCP (IPv4)
-  fd = socket(AF_INET, SOCK_STREAM, 0);
-  if (fd < 0) {
-    fprintf(stderr, "[Servidor Prethreaded] Error %d al crear socket TCP\n",
-            errno);
-    return errno;
+  // Inicializar conexión TCP
+  servidor->fd = tcp_connection_init(puerto, NULL);
+  if (servidor->fd == -1) {
+    fprintf(stderr, "[Servidor Prethreaded] Error al iniciar conexión TPC\n");
+    return EIO;
   }
-
-  // Inicializar dirección IP
-  address.sin_family = AF_INET;         // IPv4
-  address.sin_port = htons(puerto);     // Número de puerto en network byte order
-  address.sin_addr.s_addr = INADDR_ANY; // Cualquier dirección de enlace
-
-  /* Diferencia entre el tamaño de sockaddr y sockaddr_in, se debe limpiar
-     para evitar bugs */
-  memset(&address.sin_zero, 0, sizeof(address.sin_zero));
-
-  // Asignar dirección IP al socket
-  status = bind(fd, (struct sockaddr *)&address, sizeof(address));
-  if (status) {
-    fprintf(stderr, "[Servidor Prethreaded] Error %d al asignar una dirección"
-            " IPv4 al socket TCP\n", errno);
-    return errno;
-  }
-
-  // Asignar el file descriptor y la dirección del servidor
-  servidor->fd      = fd;
-  servidor->address = address;
 
   // Inicializar el pool de threads para atender solicitudes
+  servidor->thread_quantity = cantidad_threads;
   servidor->thread_pool = (pthread_t *)malloc(servidor->thread_quantity *
                                               sizeof(pthread_t));
   if (servidor->thread_pool == NULL) {
-    status = -ENOMEM;
+    status = ENOMEM;
     fprintf(stderr, "[Servidor Prethreaded] Error %d al hacer alloc de thread"
                      " pool\n", status);
-    return status;
+    goto error_fd;
   }
 
   servidor->thread_control =
     (thread_control_t *)malloc(servidor->thread_quantity *
                                sizeof(thread_control_t));
   if (servidor->thread_control == NULL) {
-    status = -ENOMEM;
+    status = ENOMEM;
     fprintf(stderr, "[Servidor Prethreaded] Error %d al hacer alloc de thread"
                     " control\n", status);
-    return status;
+    goto error_tp;
   }
 
   for(int i = 0; i < cantidad_threads; i++) {
@@ -168,14 +141,14 @@ int prethreaded_server_init(uint16_t puerto,
     if(status){
       fprintf(stderr, "[Servidor Prethreaded] Error %d al iniciar el mutex del"
                        " thread número %d\n", status, i);
-      return status;
+      goto error_tc;
     }
 
     status = pthread_cond_init(&servidor->thread_control[i].signal, NULL);
     if(status){
       fprintf(stderr, "[Servidor Prethreaded] Error %d al iniciar el cond del"
                        " thread número %d\n", status, i);
-      return status;
+      goto error_tc;
     }
 
     // Indicar al thread que debe iniciar la ejecución
@@ -187,150 +160,171 @@ int prethreaded_server_init(uint16_t puerto,
     if(status){
       fprintf(stderr, "[Servidor Prethreaded] Error %d al crear thread número"
                        " %d\n", status, i);
-      return status;
+      goto error_tc;
     }
 
   }
 
-  // Asignar cantidad de threads a la información del servidor
-  servidor->thread_quantity = cantidad_threads;
-
-  // Esperar conexiones de clientes
-  status = listen(fd, CONNECTIONS_QUEUE_LEN);
-  if (status) {
-    fprintf(stderr, "[Servidor Prethreaded] Error %d al esperar conexiones en"
-                    " el socket TCP\n", errno);
-    return errno;
-  }
+  servidor->run = true;
 
   return EXIT_SUCCESS;
+
+error_tc:
+  free(servidor->thread_control);
+error_tp:
+  free(servidor->thread_pool);
+error_fd:
+  close(servidor->fd);
+
+  return status;
 }
 
 /*
  * Correr servidor prethreaded
  */
-int prethreaded_server_run(servidor_prethreaded_t servidor) {
+int prethreaded_server_run(servidor_prethreaded_t *servidor) {
   int request_fd;
   int status;
-  socklen_t address_len = sizeof(servidor.address);
+  struct sockaddr_in client_address;
+  socklen_t address_len = sizeof(client_address);
 
   // TODO: Hacer loop para aceptar conexiones
 
-  request_fd = accept(servidor.fd, (struct sockaddr *)&servidor.address,
-                      &address_len);
-  if (request_fd < 0) {
-    fprintf(stderr, "[Servidor Prethreaded] Error %d al aceptar una "
-            "conexión\n", errno);
-    return errno;
-  }
-
-  for(int i = 0; i < servidor.thread_quantity; i++) {
-
-    // Si obtenemos el lock de un thread, significa que está desocupado
-    status = pthread_mutex_trylock(&servidor.thread_control[i].mutex);
-    if (status) {
-      if (status == EBUSY) continue;
-      fprintf(stderr, "[Servidor Prethreaded] Error %d al obtener el lock del "
-                      "thread número %d\n", status, i);
-      return status;
+  while(servidor->run) {
+    request_fd = accept(servidor->fd, (struct sockaddr *)&client_address,
+                        &address_len);
+    if (request_fd < 0) {
+      fprintf(stderr, "[Servidor Prethreaded] Error %d al aceptar una "
+              "conexión\n", errno);
+      status = errno;
+      goto error;
     }
 
-    // Asignar el file descriptor de la conexión
-    servidor.thread_control[i].connection_fd = request_fd;
+    printf("[Servidor Prethreaded] Atendiendo al cliente %s\n",
+           inet_ntoa(client_address.sin_addr));
 
-    // Enviar señal para despertar al thread
-    status = pthread_cond_signal(&servidor.thread_control[i].signal);
-    if (status) {
-      fprintf(stderr, "[Servidor Prethreaded] Error %d al hacerle signal al "
-                      "thread número %d\n", status, i);
-      return status;
-    }
+    for(int i = 0; i < servidor->thread_quantity; i++) {
 
-    // Liberar el lock del thread
-    status = pthread_mutex_unlock(&servidor.thread_control[i].mutex);
-    if (status) {
-      if (status == EBUSY) continue;
-      fprintf(stderr, "[Servidor Prethreaded] Error %d al liberar el lock del "
-                      "thread número %d\n", status, i);
-      return status;
+      // Si obtenemos el lock de un thread, significa que está desocupado
+      status = pthread_mutex_trylock(&servidor->thread_control[i].mutex);
+      if (status) {
+        if (status == EBUSY) continue;
+        fprintf(stderr, "[Servidor Prethreaded] Error %d al obtener el lock del "
+                        "thread número %d\n", status, i);
+        goto error;
+      }
+
+      // Asignar el file descriptor de la conexión
+      servidor->thread_control[i].connection_fd = request_fd;
+
+      // Enviar señal para despertar al thread
+      status = pthread_cond_signal(&servidor->thread_control[i].signal);
+      if (status) {
+        fprintf(stderr, "[Servidor Prethreaded] Error %d al hacerle signal al "
+                        "thread número %d\n", status, i);
+        goto error;
+      }
+
+      // Liberar el lock del thread
+      status = pthread_mutex_unlock(&servidor->thread_control[i].mutex);
+      if (status) {
+        if (status == EBUSY) continue;
+        fprintf(stderr, "[Servidor Prethreaded] Error %d al liberar el lock del "
+                        "thread número %d\n", status, i);
+        goto error;
+      }
     }
   }
 
   return EXIT_SUCCESS;
+
+error:
+  free(servidor->thread_control);
+  free(servidor->thread_pool);
+  close(servidor->fd);
+
+  return status;
 }
 
 /*
  * Finalizar servidor prethreaded
  */
-int prethreaded_server_uninit(servidor_prethreaded_t servidor) {
+int prethreaded_server_uninit(servidor_prethreaded_t *servidor) {
   int status;
 
-  // Cerrar el file descriptor del servidor
-  status = close(servidor.fd);
-  if (status) {
-    fprintf(stderr, "[Servidor Prethreaded] Error %d al cerrar el file"
-                    " descriptor del servidor\n", errno);
-    return errno;
-  }
+  printf("[Servidor Prethreaded] Desinicializando servidor\n");
+
+  servidor->run = false;
+
+  status = tcp_connection_uninit(servidor->fd);
+  if (status) goto error_fd;
 
   /* Despertar a los threads indicando que deben detenerse, destruir el cond y
      mutex de cada thread */
-  for(int i=0; i<servidor.thread_quantity; i++) {
+  for(int i=0; i<servidor->thread_quantity; i++) {
 
     // Si obtenemos el lock de un thread, significa que está desocupado
-    status = pthread_mutex_lock(&servidor.thread_control[i].mutex);
+    status = pthread_mutex_lock(&servidor->thread_control[i].mutex);
     if (status) {
       fprintf(stderr, "[Servidor Prethreaded] Error %d al obtener el lock de "
                       "un thread de atención de solicitudes\n", status);
-      return status;
+      goto error_free;
     }
 
     // Indicar al thread que debe detenerse
-    servidor.thread_control[i].run = false;
+    servidor->thread_control[i].run = false;
 
     // Enviar señal para despertar al thread
-    status = pthread_cond_signal(&servidor.thread_control[i].signal);
+    status = pthread_cond_signal(&servidor->thread_control[i].signal);
     if (status) {
       fprintf(stderr, "[Servidor Prethreaded] Error %d al hacerle signal al "
                       "thread número %d\n", status, i);
-      return status;
+      goto error_free;
     }
 
-    status = pthread_mutex_unlock(&servidor.thread_control[i].mutex);
+    status = pthread_mutex_unlock(&servidor->thread_control[i].mutex);
     if (status) {
       fprintf(stderr, "[Servidor Prethreaded] Error %d al desbloquear el lock "
                       "del thread de número %d\n", status, i);
-      return status;
+      goto error_free;
     }
 
     /* Hacer join del thread para que el proceso principal espere a que
        termine */
-    status = pthread_join(servidor.thread_pool[i], NULL);
+    status = pthread_join(servidor->thread_pool[i], NULL);
     if(status){
       fprintf(stderr, "[Servidor Prethreaded] Error %d al crear hacer join"
                       " del thread número %d\n", status, i);
-      return status;
+      goto error_free;
     }
 
-    status = pthread_mutex_destroy(&servidor.thread_control[i].mutex);
+    status = pthread_mutex_destroy(&servidor->thread_control[i].mutex);
     if(status){
       fprintf(stderr, "[Servidor Prethreaded] Error %d al destruir el mutex"
                        " del thread número %d\n", status, i);
-      return status;
+      goto error_free;
     }
 
-    status = pthread_cond_destroy(&servidor.thread_control[i].signal);
+    status = pthread_cond_destroy(&servidor->thread_control[i].signal);
     if(status) {
       fprintf(stderr, "[Servidor Prethreaded] Error %d al destruir el cond del"
                       " thread número %d\n", status, i);
-      return status;
+      goto error_free;
     }
 
-    }
+  }
 
-    // Liberar thread control y thread pool
-    free(servidor.thread_control);
-    free(servidor.thread_pool);
+  // Liberar thread control y thread pool
+  free(servidor->thread_control);
+  free(servidor->thread_pool);
 
   return EXIT_SUCCESS;
+
+error_fd:
+  close(servidor->fd);
+error_free:
+  free(servidor->thread_control);
+  free(servidor->thread_pool);
+
+  return status;
 }

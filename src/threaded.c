@@ -39,17 +39,10 @@ int save_global_count_bytes(int bytes_sent, shared_variables_t *shared_variables
 // clean up listening socket on ctrl-c
 void cleanup(int sig)
 {
-    printf("PID:%i Cleaning up connections and exiting.\n", getpid());
+    printf("Cleaning up connections and exiting.\n");
 
-    // try to close the listening socket
-    if (close(listening_socket) < 0)
-    {
-        fprintf(stderr, "Error calling close()\n");
-        exit(EXIT_FAILURE);
-    }
-
-    // Close the shared memory we used
-    shm_unlink("/sharedmem");
+    // Close listening socket
+    tcp_connection_uninit(listening_socket);
 
     // exit with success
     exit(EXIT_SUCCESS);
@@ -83,39 +76,20 @@ void* process_request(void *thread_info_void){
 int execute_threaded_server(int port_int, char *root) {
     struct sockaddr_in servaddr;
     shared_variables_t *shared_variables;
-    short int port = port_int;
     socklen_t addr_size = sizeof(servaddr);
 
     // set up signal handler for ctrl-c
     (void) signal(SIGINT, cleanup);
 
-    // create the listening socket
-    if ((listening_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-    {
-        fprintf(stderr, "Error creating listening socket.\n");
-        exit(EXIT_FAILURE);
-    }
-
-    // set all bytes in socket address structure to zero, and fill in the relevant data members
-    memset(&servaddr, 0, sizeof(servaddr));
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    servaddr.sin_port = htons(port);
-
-    if (bind(listening_socket, (struct sockaddr *) &servaddr, sizeof(servaddr)) < 0)
-    {
-        fprintf(stderr, "Error calling bind()\n");
-        exit(EXIT_FAILURE);
+    // Create listening socket
+    listening_socket = tcp_connection_init(port_int, NULL);
+    if (listening_socket < 0) {
+      return EXIT_FAILURE;
     }
 
     shared_variables = malloc(sizeof(shared_variables_t));
     pthread_mutex_init(&shared_variables->total_bytes_mutex_lock, NULL);
     shared_variables->total_bytes = 0;
-
-    if ((listen(listening_socket, SERVER_BACKLOG)) == -1) {
-        fprintf(stderr, "Error Listening\n");
-        exit(EXIT_FAILURE);
-    }
 
     while(1){
         thread_info_t current_thread_info;
@@ -134,4 +108,3 @@ int execute_threaded_server(int port_int, char *root) {
     }
     return EXIT_FAILURE;
 }
-

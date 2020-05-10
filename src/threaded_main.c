@@ -61,6 +61,10 @@ int main(int argc, char *argv[]) {
 
     printf("%s ejecutando con el root path %s en el puerto %d\n",argv[0], root,
            puerto);
+
+    printf("Presione CTRL+C para terminar el programa\n");
+
     execute_threaded_server(puerto, root);
+
     return EXIT_SUCCESS;
 }

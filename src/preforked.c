@@ -42,12 +42,8 @@ int save_global_count_bytes(int bytes_sent, shared_variables_t *mempointer)
 void cleanup(int sig) {
     printf("PID:%i Cleaning up connections and exiting.\n", getpid());
 
-    // try to close the listening socket
-    if (close(list_s) < 0)
-    {
-        fprintf(stderr, "Error calling close()\n");
-        exit(EXIT_FAILURE);
-    }
+    // Close listening socket
+    tcp_connection_uninit(list_s);
 
     // Close the shared memory we used
     shm_unlink("/sharedmem");
@@ -75,35 +71,16 @@ int execute_preforked_server(int puerto, char *root, int procesos) {
     int children = 0;
     int childref[procesos - 1];
     int sharedmem;
-    short int port = puerto;
     struct sockaddr_in servaddr;
     pid_t pid;
 
     // set up signal handler for ctrl-c
     (void) signal(SIGINT, cleanup);
 
-    // create the listening socket
-    if ((list_s = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        fprintf(stderr, "Error creating listening socket.\n");
-        return EXIT_FAILURE;
-    }
-
-    // set all bytes in socket address structure to zero, and fill in the relevant data members
-    memset(&servaddr, 0, sizeof(servaddr));
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    servaddr.sin_port = htons(port);
-
-    // bind to the socket address
-    if (bind(list_s, (struct sockaddr *) &servaddr, sizeof(servaddr)) < 0)  {
-        fprintf(stderr, "Error calling bind()\n");
-        return EXIT_FAILURE;
-    }
-
-    // Listen on socket list_s
-    if ((listen(list_s, SERVER_BACKLOG)) == -1) {
-        fprintf(stderr, "Error Listening\n");
-        return EXIT_FAILURE;
+    // Create listening socket
+    list_s = tcp_connection_init(puerto, NULL);
+    if (list_s < 0) {
+      return EXIT_FAILURE;
     }
 
     // Close shared memory

@@ -1,8 +1,51 @@
 #include <stdio.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <fcntl.h>
+#include <stdbool.h>
+#include <sys/mman.h>
 #include "forked.h"
+
+static int socket_fd;
+
+void sigint_handler(int sig_num) {
+  int shmem_fd;
+  bool *run;
+
+  // Abrir memoria compartida en modo read/write
+  shmem_fd = shm_open("/forked_shmem", O_RDWR, S_IRUSR | S_IWUSR);
+
+  if (shmem_fd == -1) {
+      fprintf(stderr, "Error %d al abrir la memoria compartida del servidor "
+                      "forked", errno);
+  }
+
+  // Asignar el tamaño de la memoria
+  ftruncate(shmem_fd, sizeof(bool));
+
+  // Mapear la memoria
+  run = mmap(NULL, sizeof(bool), PROT_READ | PROT_WRITE, MAP_SHARED,
+             shmem_fd, 0);
+
+  if (run == MAP_FAILED)
+  {
+      fprintf(stderr, "Error %d al mapear la memoria compartida del servidor "
+                      "forked\n ", errno);
+  }
+
+  // Indicar a los procesos que deben terminar
+  *run = false;
+
+  // Unmap memory and close file
+  munmap(run, sizeof(bool));
+  shm_unlink("forked_shmem");
+
+  printf("CTRL+C fue presionado, el servidor debe terminar\n");
+  tcp_connection_uninit(socket_fd);
+  exit(EXIT_SUCCESS);
+}
 
 int main(int argc, char *argv[]) {
     int   opt;
@@ -50,7 +93,19 @@ int main(int argc, char *argv[]) {
     printf("%s ejecutando con el root path %s en el puerto %d\n",argv[0], root,
            puerto);
 
-    execute_forked_server(puerto, root);
+    socket_fd = init_forked_server(puerto);
+    if (socket_fd < 0) {
+      return EXIT_FAILURE;
+    }
+
+    if (signal(SIGINT, sigint_handler) == SIG_ERR) {
+      fprintf(stderr, "Error %d al instalar el handler para SIGINT\n", errno);
+      return EXIT_FAILURE;
+    }
+
+    printf("Presione CTRL+C para terminar el programa\n");
+
+    execute_forked_server(socket_fd, root);
 
     return EXIT_SUCCESS;
 }
