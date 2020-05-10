@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -5,13 +6,20 @@
 #include <arpa/inet.h>
 #include "prethreaded.h"
 
+static servidor_prethreaded_t servidor;
+
+void sigint_handler(int sig_num) {
+  printf("CTRL+C fue presionado, el servidor debe terminar\n");
+  prethreaded_server_uninit(&servidor);
+  exit(EXIT_SUCCESS);
+}
+
 int main(int argc, char *argv[]) {
   int status;
   int   opt;
   char *root    = NULL;
   int   puerto  = -1;
   int   threads = -1;
-  servidor_prethreaded_t servidor;
 
   while ((opt = getopt(argc, argv, "p:r:n:")) != -1) {
       switch (opt) {
@@ -67,16 +75,16 @@ int main(int argc, char *argv[]) {
   if(status) return status;
 
   printf("%s ejecutando con un máximo de %d threads con el root path %s "
-         "en el puerto %d de la máquina IP %s\n",argv[0], threads, root, puerto,
-          inet_ntoa(servidor.address.sin_addr));
+         "en el puerto %d\n",argv[0], threads, root, puerto);
 
-  status = prethreaded_server_run(servidor);
-  if (status) return status;
+  if (signal(SIGINT, sigint_handler) == SIG_ERR) {
+    fprintf(stderr, "Error %d al instalar el handler para SIGINT\n", errno);
+    return EXIT_FAILURE;
+  }
 
-  fprintf(stdout, "%s\n", "Press any key to exit");
-  getchar();
+  printf("Presione CTRL+C para terminar el programa\n");
 
-  status = prethreaded_server_uninit(servidor);
+  status = prethreaded_server_run(&servidor);
   if (status) return status;
 
   return EXIT_SUCCESS;

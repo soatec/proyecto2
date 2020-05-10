@@ -2,81 +2,98 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdbool.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <sys/mman.h>
 #include "forked.h"
 #include "utils.h"
 
 #define SERVER_NAME "ForkedServer"
 
-int init_server(char *port){
-    int socket_file_descriptor;
-    //Type addrinfo is defined in netdb.h
-    struct addrinfo hints;
-    struct addrinfo *res;
-    struct addrinfo *p;
-    int getaddrinfo_response;
+int init_forked_server(int port_int){
+  int fd;
+  int shmem_fd;
+  bool *run;
 
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_PASSIVE;
-    getaddrinfo_response = getaddrinfo(NULL, port, &hints, &res);
-    if (getaddrinfo_response != 0) {
-        fprintf(stderr, "Error en la función getaddrinfo_response. (Errno. %s)\n",
-                strerror(errno));
-        exit(EXIT_FAILURE);
-    }
+  // Abrir memoria compartida en modo read/write
+  shmem_fd = shm_open("forked_shmem",
+                      O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
 
-    for (p = res; p != NULL; p = p->ai_next) {
-        socket_file_descriptor = socket(p->ai_family, p->ai_socktype, 0);
-        if (socket_file_descriptor == -1) {
-            continue;
-        }
-        if (bind(socket_file_descriptor, p->ai_addr, p->ai_addrlen) == 0) {
-            break;
-        }
-    }
-    if (p == NULL) {
-        fprintf(stderr, "Error en la función socket o bind. (Errno. %s)\n",
-                strerror(errno));
-        exit(EXIT_FAILURE);
-    }
+  if (shmem_fd == -1) {
+      fprintf(stderr, "Error %d al abrir la memoria compartida del servidor "
+                      "forked", errno);
+      return -1;
+  }
 
-    freeaddrinfo(res);
-    if (listen(socket_file_descriptor, SOMAXCONN) != 0) {
-        fprintf(stderr, "Error en la función listen. (Errno. %s)\n",
-                strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-    return socket_file_descriptor;
+  // Asignar el tamaño de la memoria
+  ftruncate(shmem_fd, sizeof(bool));
+
+  // Mapear la memoria
+  run = mmap(NULL, sizeof(bool), PROT_READ | PROT_WRITE, MAP_SHARED,
+             shmem_fd, 0);
+
+  if (run == MAP_FAILED)
+  {
+      fprintf(stderr, "Error %d al mapear la memoria compartida del servidor "
+                      "forked\n ", errno);
+      return -1;
+  }
+
+  printf("Inicializando servidor...\n");
+  fd = tcp_connection_init(port_int, NULL);
+  if (fd < 0) {
+    fprintf(stderr, "Error inicializando servidor\n");
+    return -1;
+  }
+
+  // Indicar a los procesos que el servidor está corriendo
+  *run = true;
+
+  // Unmap memory
+  munmap(run, sizeof(bool));
+
+  fprintf(stderr, "Servidor inicializado\n");
+
+  return fd;
 }
 
-int execute_forked_server(int port_int, char *root){
+int execute_forked_server(int socket_file_descriptor, char *root){
     // struct sockaddr_in is defined in in.h
     struct sockaddr_in client_address;
     socklen_t client_address_length = sizeof(client_address);
-    char port_char[6];
-    int socket_file_descriptor;
     int accept_response;
     int fork_response;
+    int shmem_fd;
+    bool *run;
 
-    sprintf(port_char, "%d", port_int);
-    printf("El servidor ha iniciado en el puerto No. %s con el directorio raiz %s\n", port_char, root);
+    // Abrir memoria compartida en modo read/write
+    shmem_fd = shm_open("forked_shmem", O_RDWR, S_IRUSR | S_IWUSR);
 
-    printf("Inicializando servidor...\n");
-    socket_file_descriptor = init_server(port_char);
-
-    if (socket_file_descriptor < 0) {
-        fprintf(stderr, "Error inicializando el servidor. (Errno. %s)\n", strerror(errno));
-        return EXIT_FAILURE;
+    if (shmem_fd == -1) {
+        fprintf(stderr, "Error %d al abrir la memoria compartida del servidor "
+                        "forked", errno);
+        return errno;
     }
 
-    printf("Servidor inicializado\n");
+    // Asignar el tamaño de la memoria
+    ftruncate(shmem_fd, sizeof(bool));
 
-    while (1) {
+    // Mapear la memoria
+    run = mmap(NULL, sizeof(bool), PROT_READ | PROT_WRITE, MAP_SHARED,
+               shmem_fd, 0);
+
+    if (run == MAP_FAILED)
+    {
+        fprintf(stderr, "Error %d al mapear la memoria compartida del servidor "
+                        "forked\n ", errno);
+        return errno;
+    }
+
+    while (*run) {
         printf("Esperando solicitud...\n");
         accept_response = accept(socket_file_descriptor, (struct sockaddr*)&client_address, &client_address_length);
         printf("Solicitud recibida\n");
@@ -103,4 +120,9 @@ int execute_forked_server(int port_int, char *root){
         }
         printf("Se creó el proceso con PID: %d\n", fork_response);
     }
+
+    // Unmap memory
+    munmap(run, sizeof(bool));
+
+    return EXIT_SUCCESS;
 }

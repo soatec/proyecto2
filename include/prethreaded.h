@@ -1,7 +1,6 @@
 #ifndef PROYECTO2_PRETHREADED_H
 #define PROYECTO2_PRETHREADED_H
 
-#include <netinet/in.h>
 #include <pthread.h>
 #include <stdbool.h>
 #include "utils.h"
@@ -82,9 +81,6 @@ typedef struct servidor_prethreaded {
   /** File descriptor del servidor */
   int fd;
 
-  /** Dirección IPv4 del servidor */
-  struct sockaddr_in address;
-
   /** Cantidad de threads */
   int thread_quantity;
 
@@ -93,6 +89,9 @@ typedef struct servidor_prethreaded {
 
   /** Atributos para controlar los threads */
   thread_control_t *thread_control;
+
+  /** Flag to run/stop server */
+  bool run;
 
 } servidor_prethreaded_t;
 
@@ -119,7 +118,7 @@ int prethreaded_server_init(uint16_t puerto,
  * @returns 0 si la operación es exitosa, sino el código de error
  *
  */
-int prethreaded_server_run(servidor_prethreaded_t servidor);
+int prethreaded_server_run(servidor_prethreaded_t *servidor);
 
 /**
  * Finalizar servidor prethreaded
@@ -129,6 +128,6 @@ int prethreaded_server_run(servidor_prethreaded_t servidor);
  * @returns 0 si la operación es exitosa, sino el código de error.
  *
  */
-int prethreaded_server_uninit(servidor_prethreaded_t servidor);
+int prethreaded_server_uninit(servidor_prethreaded_t *servidor);
 
 #endif //PROYECTO2_PRETHREADED_H

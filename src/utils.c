@@ -3,11 +3,18 @@
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
+#include <arpa/inet.h>
 #include <linux/limits.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
 #include <sys/stat.h>
 #include <errno.h>
 #include "utils.h"
+
+/*
+ * Tamaño de la cola de espera del servidor
+ */
+#define CONNECTIONS_QUEUE_LEN 1000
 
 #define WRITE_BUFFER_SIZE 1024
 #define READ_BUFFER_SIZE 212992
@@ -194,7 +201,7 @@ int respond_to_request(char *root, int file_descriptor, char *server_name) {
         close_connection(file_descriptor);
         return response_size;
     }
-    
+
     if (strncmp(method_name, "GET\0", 4) == 0) {
         response_size = respond_to_get_request(root, file_descriptor, requested_resource_path, server_name);
     } else if (strncmp(method_name, "PUT\0", 4) == 0) {
@@ -210,3 +217,64 @@ int respond_to_request(char *root, int file_descriptor, char *server_name) {
     return response_size;
 }
 
+int tcp_connection_init(uint16_t puerto, char *direccion_ip) {
+  int status;
+  int  fd;
+  struct sockaddr_in address;
+
+  // Crear socket TCP (IPv4)
+  fd = socket(AF_INET, SOCK_STREAM, 0);
+  if (fd < 0) {
+    fprintf(stderr, "Error %d al crear socket TCP\n", errno);
+    return -1;
+  }
+
+  // Inicializar dirección IP
+  address.sin_family = AF_INET;         // IPv4
+  address.sin_port = htons(puerto);     // Número de puerto en network byte order
+  if (direccion_ip == NULL) {
+    address.sin_addr.s_addr = INADDR_ANY; // Cualquier dirección de enlace
+  } else {
+    status = inet_aton(direccion_ip, &address.sin_addr);
+    if (status == 0) {
+      fprintf(stderr, "Error al convertir dirección IP\n");
+      return -1;
+    }
+  }
+
+  /* Diferencia entre el tamaño de sockaddr y sockaddr_in, se debe limpiar
+     para evitar bugs */
+  memset(&address.sin_zero, 0, sizeof(address.sin_zero));
+
+  // Asignar dirección IP al socket
+  status = bind(fd, (struct sockaddr *)&address, sizeof(address));
+  if (status) {
+    fprintf(stderr, "[Servidor Prethreaded] Error %d al asignar una dirección"
+            " IPv4 al socket TCP\n", errno);
+    return -1;
+  }
+
+  // Esperar conexiones de clientes
+  status = listen(fd, CONNECTIONS_QUEUE_LEN);
+  if (status) {
+    fprintf(stderr, "[Servidor Prethreaded] Error %d al esperar conexiones en"
+                    " el socket TCP\n", errno);
+    return -1;
+  }
+
+  return fd;
+}
+
+int tcp_connection_uninit(int fd) {
+int status;
+
+  // Cerrar el file descriptor del servidor
+  status = close(fd);
+  if (status) {
+    fprintf(stderr, "[Servidor Prethreaded] Error %d al cerrar el file"
+                    " descriptor del servidor\n", errno);
+    return -1;
+  }
+
+  return 0;
+}
