@@ -1,12 +1,13 @@
 # Proyecto 2: Diseño de un *Web Server* Simplificado
 
 El propósito de este proyecto es contrastar varias posibilidades de diseño de un servidor en un ambiente distribuido.
-La solución del problema es la implementación de 1 cliente 5 versiones diferentes de *Web Server*: secuencial, forked, threaded, 
-pre-forked y pre-threaded. Cada uno se ejecuta de manera independiente de los otros.
+La solución del problema es la implementación de 1 cliente y 5 versiones diferentes de *Web Server*: secuencial, forked, threaded, 
+pre-forked y pre-threaded. Cada uno se ejecuta de manera independiente de los otros e implementa de forma básica los métodos
+HEAD, GET, PUT y DELETE.
 
 ### Estructura y compilación del proyecto
-- include: Contiene los archivos .h de los 5 *Web Server*, el cliente y util.
-- src: Contiene los archivos .c  de los 5 *Web Server*, el cliente y util.
+- include: Contiene los archivos .h de los 5 *Web Server*, el cliente y utils.
+- src: Contiene los archivos .c  de los 5 *Web Server*, el cliente y utils.
 - build: contiene los archivos ejecutables generados por el makefile. Este directorio se crea con la regla `all` del makefile.
 
 Para compilar el proyecto, se utiliza el makefile:
@@ -70,6 +71,19 @@ Recibe como parámetros -m nombre_ip_maquina_servidor -p puerto-a archivo_solici
 ./build/cliente -m [nombre_ip_maquina_servidor] -p [puerto] -a [archivo_solicitado] -t [número_threads] -c [número_ciclos]
 
 ```
+## Ejemplo de uso
+
+En este ejemplo se usa el generador de *HTTP requests* online https://reqbin.com/ usando Google Chrome Version 81.0.4044.113.
+
+### Inicializar un servidor
+Se usa el servidor forked con root `/home/server_root` en el puerto 10000, 
+ejecutando en la raíz del proyecto:
+
+```
+make
+./build/forked -r "/home/user/server_root" -p 10000
+```
+![Alt text](docs/serverinit.png?raw=true "Title")
 
 ## Autores
 

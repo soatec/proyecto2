@@ -11,7 +11,7 @@ int main(int argc, char *argv[]) {
     char *root    = NULL;
     int   puerto  = -1;
     int   server_status;
-    DIR *dir;
+    DIR  *dir;
 
     while ((opt = getopt(argc, argv, "p:r:")) != -1) {
         switch (opt) {

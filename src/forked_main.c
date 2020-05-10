@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <stdbool.h>
 #include <sys/mman.h>
+#include <dirent.h>
 #include "forked.h"
 
 static int socket_fd;
@@ -51,6 +52,8 @@ int main(int argc, char *argv[]) {
     int   opt;
     char *root   = NULL;
     int   puerto = -1;
+    int   server_status;
+    DIR  *dir;
 
     while ((opt = getopt(argc, argv, "p:r:")) != -1) {
         switch (opt) {
@@ -68,6 +71,16 @@ int main(int argc, char *argv[]) {
 
     if (root == NULL) {
         fprintf(stderr, "r root_servidor es un parámetro obligatorio\n");
+        return EXIT_FAILURE;
+    }
+    dir = opendir(root);
+    if (dir) {
+        closedir(dir);
+    } else if (ENOENT == errno) {
+        fprintf(stderr, "-r root_servidor no es un directorio valido\n");
+        return EXIT_FAILURE;
+    } else {
+        fprintf(stderr, "-r root_servidor no es un directorio valido\n");
         return EXIT_FAILURE;
     }
 
@@ -105,7 +118,7 @@ int main(int argc, char *argv[]) {
 
     printf("Presione CTRL+C para terminar el programa\n");
 
-    execute_forked_server(socket_fd, root);
+    server_status = execute_forked_server(socket_fd, root);
 
-    return EXIT_SUCCESS;
+    return server_status;
 }
