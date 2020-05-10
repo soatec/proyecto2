@@ -353,11 +353,18 @@ int tcp_connection_init(uint16_t puerto, char *direccion_ip) {
   int status;
   int  fd;
   struct sockaddr_in address;
+  int reuse_addr = 1;
 
   // Crear socket TCP (IPv4)
   fd = socket(AF_INET, SOCK_STREAM, 0);
   if (fd < 0) {
     fprintf(stderr, "Error %d al crear socket TCP\n", errno);
+    return -1;
+  }
+
+  if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse_addr, sizeof(int)) < 0) {
+    fprintf(stderr, "Error %d al activar el flag reuse_addr del socket TCP\n",
+    errno);
     return -1;
   }
 
@@ -399,6 +406,14 @@ int tcp_connection_init(uint16_t puerto, char *direccion_ip) {
 
 int tcp_connection_uninit(int fd) {
 int status;
+
+  // Finalizar el flujo de datos
+  status = shutdown(fd, SHUT_RDWR);
+  if (status) {
+    fprintf(stderr, "[Servidor Prethreaded] Error %d al cerrar el file"
+                    " descriptor del servidor\n", errno);
+    return -1;
+  }
 
   // Cerrar el file descriptor del servidor
   status = close(fd);
