@@ -4,8 +4,30 @@
 #include <signal.h>
 #include <stdint.h>
 
-
+/**
+ *
+ * @param root
+ * @param file_descriptor
+ * @param server_name
+ * @return
+ */
 int respond_to_request(char *root, int file_descriptor, char *server_name);
+
+/**
+ *
+ * @param file_descriptor
+ * @param server_name
+ * @return
+ */
+int respond_internal_server_error(int file_descriptor, char *server_name);
+
+/**
+ *
+ * @param file_descriptor
+ * @param server_name
+ * @return
+ */
+int respond_service_unavailable(int file_descriptor, char *server_name);
 
 /** Util para inicializar un socket TCP
  *

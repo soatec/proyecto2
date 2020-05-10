@@ -100,6 +100,7 @@ int execute_forked_server(int socket_file_descriptor, char *root){
         if (accept_response < 0) {
             fprintf(stderr, "Error esperando una conexión de socket en la función accept. (Errno. %s)\n",
                     strerror(errno));
+            respond_internal_server_error(socket_file_descriptor, SERVER_NAME);
             continue;
         }
 
@@ -116,6 +117,7 @@ int execute_forked_server(int socket_file_descriptor, char *root){
         if (fork_response < 0) {
             fprintf(stderr, "Error ejecutando la función fork. (Errno. %s)\n",
                     strerror(errno));
+            respond_service_unavailable(socket_file_descriptor, SERVER_NAME);
             continue;
         }
         printf("Se creó el proceso con PID: %d\n", fork_response);
