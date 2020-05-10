@@ -1,6 +1,7 @@
 #ifndef PROYECTO2_THREADED_H
 #define PROYECTO2_THREADED_H
 
+#include <pthread.h>
 #include "utils.h"
 
 // structure to hold the return code and the filepath to serve to client.
@@ -9,6 +10,20 @@ typedef struct {
     char* filename;
     char* contentType;
 } httpRequest;
+
+// Structure to hold variables that will be placed in shared memory
+typedef struct {
+    pthread_mutex_t mutexlock;
+    pthread_mutex_t accept_connection_lock;
+    int totalbytes;
+} sharedVariables;
+
+typedef struct{
+    int connfd_thread;
+    char *root;
+    sharedVariables sharedVars;
+} threadInfo;
+
 
 int getFileSize(char *filename);
 
@@ -30,6 +45,8 @@ httpRequest parseRequest(char* msg, char* rootdir);
 int writeFile(int fd, char *filename);
 
 int writeHeader(int fd, int returncode, char* filename, char* contentType);
+
+void* connection(void* p);
 
 
 #endif //PROYECTO2_THREADED_H

@@ -22,14 +22,14 @@
 #include <signal.h>           // signal handling
 #include <sys/mman.h>         // mmap library
 
-#include "preforked.h"
-#include "utils.h"
-
 
 typedef struct {
     char *ext;
     char *mediatype;
 } extn;
+
+
+int totaldata;
 
 //Possible media types
 extn extensions[] ={
@@ -384,3 +384,50 @@ int writeHeader(int fd, int returncode, char *filename, char *contentType)
     return 0;
 }
 
+// Increment the global count of data sent out 
+int recordTotalBytes(int bytes_sent, sharedVariables *mempointer)
+{
+    // Lock the mutex
+    pthread_mutex_lock(&(*mempointer).mutexlock);
+    // Increment bytes_sent
+    (*mempointer).totalbytes += bytes_sent;
+    // Unlock the mutex
+    pthread_mutex_unlock(&(*mempointer).mutexlock);
+    // Return the new byte count
+    return (*mempointer).totalbytes;
+}
+
+void* connection(void *p){
+    
+    // Sizes of data were sending out
+    int headersize;
+    int pagesize;
+
+    threadInfo *info = (threadInfo*)p;
+
+    int connfd_thread = info->connfd_thread;
+
+    char *header = getMessage(connfd_thread);
+
+    httpRequest details = parseRequest(header, info->root);
+
+    // Free header now were done with it
+    free(header);
+
+    // Print out the correct header
+    headersize = writeHeader(connfd_thread, details.returncode, details.filename, details.contentType);
+    
+    // Print out the file they wanted
+    pagesize = writeFile(connfd_thread, details.filename);
+
+    // Increment our count of total datasent by all processes and get back the new total
+    totaldata = recordTotalBytes(headersize + pagesize, &info->sharedVars);
+
+    // Print out which process handled the request and how much data was sent
+    printf("[%d] served a request of %d bytes\n", getpid(), headersize + pagesize);
+
+    // Close the connection now were done
+    close(connfd_thread);
+    pthread_exit(NULL);
+
+}

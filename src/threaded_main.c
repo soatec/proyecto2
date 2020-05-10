@@ -15,7 +15,6 @@
 
 #include <signal.h>           // signal handling
 #include <sys/mman.h>         // mmap library
-#include <pthread.h>
 #include <sys/wait.h>
 
 #include "threaded.h"
@@ -24,32 +23,7 @@
 #define SERVER_BACKLOG 100
 
 
-// Structure to hold variables that will be placed in shared memory
-typedef struct {
-    pthread_mutex_t mutexlock;
-    pthread_mutex_t accept_connection_lock;
-    int totalbytes;
-} sharedVariables;
-
-typedef struct{
-    int connfd_thread;
-    char *root;
-} threadInfo;
-
-int list_s;
-
-// Increment the global count of data sent out 
-int recordTotalBytes(int bytes_sent, sharedVariables *mempointer)
-{
-    // Lock the mutex
-    pthread_mutex_lock(&(*mempointer).mutexlock);
-    // Increment bytes_sent
-    (*mempointer).totalbytes += bytes_sent;
-    // Unlock the mutex
-    pthread_mutex_unlock(&(*mempointer).mutexlock);
-    // Return the new byte count
-    return (*mempointer).totalbytes;
-}
+int list_s;     // listening socket
 
 // clean up listening socket on ctrl-c
 void cleanup(int sig)
@@ -83,35 +57,6 @@ int mygetch(void)
     tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
 
     return ch;
-}
-
-void* connection(void *p){
-
-
-
-    // Sizes of data were sending out
-    int headersize;
-    int pagesize;
-
-    threadInfo *info = (threadInfo*)p;
-
-    int connfd_thread = info->connfd_thread;
-
-    char *header = getMessage(connfd_thread);
-
-    httpRequest details = parseRequest(header, info->root);
-
-    free(header);
-
-    headersize = writeHeader(connfd_thread, details.returncode, details.filename, details.contentType);
-
-    pagesize = writeFile(connfd_thread, details.filename);
-
-    printf("[%d] served a request of %d bytes\n", getpid(), headersize + pagesize);
-
-    close(connfd_thread);
-    pthread_exit(NULL);
-
 }
 
 int main(int argc, char *argv[]) {
@@ -247,7 +192,8 @@ int main(int argc, char *argv[]) {
     pthread_t threads[100];
     int thread_count = 0;
 
-    while(thread_count < 100){
+    // while(thread_count < 100){
+    while(1){
         // Listen on socket list_s
         if ((listen(list_s, SERVER_BACKLOG)) == -1)
         {
@@ -256,6 +202,7 @@ int main(int argc, char *argv[]) {
         }
         connfd[thread_count].root = malloc(strlen(root));
         strcpy(connfd[thread_count].root, root); 
+        connfd[thread_count].sharedVars = *mempointer;
         printf("Waiting for a request \n");
 
         pthread_mutex_lock(&(*mempointer).accept_connection_lock);
