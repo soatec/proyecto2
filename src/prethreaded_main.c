@@ -1,10 +1,21 @@
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <arpa/inet.h>
 #include "prethreaded.h"
 
+static servidor_prethreaded_t servidor;
+
+void sigint_handler(int sig_num) {
+  printf("CTRL+C fue presionado, el servidor debe terminar\n");
+  prethreaded_server_uninit(&servidor);
+  exit(EXIT_SUCCESS);
+}
+
 int main(int argc, char *argv[]) {
+  int status;
   int   opt;
   char *root    = NULL;
   int   puerto  = -1;
@@ -13,6 +24,7 @@ int main(int argc, char *argv[]) {
   while ((opt = getopt(argc, argv, "p:r:n:")) != -1) {
       switch (opt) {
           case 'p':
+              // Rango de puertos válidos 1025-
               puerto = atoi(optarg);
               break;
           case 'r':
@@ -59,8 +71,21 @@ int main(int argc, char *argv[]) {
   printf(" \\$$    $$ \\$$     \\| $$         \\$$$   | $$ \\$$    $$ \\$$    $$| $$            | $$      | $$       \\$$     \\  \\$$  $$| $$  | $$| $$       \\$$     \\ \\$$    $$ \\$$    $$ \\$$     \\ \\$$    $$\n");
   printf("  \\$$$$$$   \\$$$$$$$ \\$$          \\$     \\$$  \\$$$$$$$  \\$$$$$$  \\$$             \\$$       \\$$        \\$$$$$$$   \\$$$$  \\$$   \\$$ \\$$        \\$$$$$$$  \\$$$$$$$  \\$$$$$$$  \\$$$$$$$  \\$$$$$$$\n\n");
 
+  status = prethreaded_server_init((uint16_t)puerto, threads, &servidor);
+  if(status) return status;
+
   printf("%s ejecutando con un máximo de %d threads con el root path %s "
          "en el puerto %d\n",argv[0], threads, root, puerto);
+
+  if (signal(SIGINT, sigint_handler) == SIG_ERR) {
+    fprintf(stderr, "Error %d al instalar el handler para SIGINT\n", errno);
+    return EXIT_FAILURE;
+  }
+
+  printf("Presione CTRL+C para terminar el programa\n");
+
+  status = prethreaded_server_run(&servidor);
+  if (status) return status;
 
   return EXIT_SUCCESS;
 }

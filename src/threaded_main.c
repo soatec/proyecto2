@@ -140,7 +140,6 @@ int main(int argc, char *argv[]) {
     servaddr.sin_port = htons(port);
 
     // bind to the socket address
-
     if (bind(list_s, (struct sockaddr *) &servaddr, sizeof(servaddr)) < 0)
     {
         fprintf(stderr, "Error calling bind()\n");

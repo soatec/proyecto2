@@ -88,6 +88,10 @@ int main(int argc, char *argv[])
     char *root = NULL;
     int puerto = -1;
     int procesos = -1;
+<<<<<<< HEAD
+=======
+    DIR *dir;
+>>>>>>> a6dbf22930d70bdc833656efc1b8a06700a64f90
 
     while ((opt = getopt(argc, argv, "p:r:n:")) != -1)
     {
@@ -115,6 +119,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
+<<<<<<< HEAD
     DIR * dir;
     if ((dir = opendir(root)))
     {
@@ -127,10 +132,20 @@ int main(int argc, char *argv[])
     }
     else
     {
+=======
+    dir = opendir(root);
+    if (dir) {
+        closedir(dir);
+    } else if (ENOENT == errno) {
+        fprintf(stderr, "-r root_servidor no es un directorio valido\n");
+        return EXIT_FAILURE;
+    } else {
+>>>>>>> a6dbf22930d70bdc833656efc1b8a06700a64f90
         fprintf(stderr, "-r root_servidor no es un directorio valido\n");
         return EXIT_FAILURE;
     }
 
+<<<<<<< HEAD
     if (puerto == -1)
     {
         fprintf(stderr, "-p puerto es un parámetro obligatorio\n");
@@ -138,10 +153,17 @@ int main(int argc, char *argv[])
     }
     else if (puerto < 0)
     {
+=======
+    if (puerto == -1) {
+        fprintf(stderr, "-p puerto es un parámetro obligatorio\n");
+        return EXIT_FAILURE;
+    } else if (puerto < 0) {
+>>>>>>> a6dbf22930d70bdc833656efc1b8a06700a64f90
         fprintf(stderr, "-p puerto debe ser positivo\n");
         return EXIT_FAILURE;
     }
 
+<<<<<<< HEAD
     if (procesos == -1)
     {
         fprintf(stderr, "-n número_procesos es un parámetro obligatorio\n");
@@ -149,6 +171,12 @@ int main(int argc, char *argv[])
     }
     else if (procesos < 0)
     {
+=======
+    if (procesos == -1) {
+        fprintf(stderr, "-n número_procesos es un parámetro obligatorio\n");
+        return EXIT_FAILURE;
+    } else if (procesos < 0) {
+>>>>>>> a6dbf22930d70bdc833656efc1b8a06700a64f90
         fprintf(stderr, "-n número_procesos debe ser positivo\n");
         return EXIT_FAILURE;
     }
@@ -166,6 +194,7 @@ int main(int argc, char *argv[])
     printf("%s ejecutando con un máximo de %d procesos con el root path %s "
         "en el puerto %d\n", argv[0], procesos, root, puerto);
 
+<<<<<<< HEAD
     int conn_s; //  connection socket
     short int port = puerto;  //  port number
     struct sockaddr_in servaddr;  //  socket address structure
@@ -337,3 +366,9 @@ int main(int argc, char *argv[])
 
     return EXIT_SUCCESS;
 }
+=======
+    execute_preforked_server(puerto, root, procesos);
+
+    return EXIT_SUCCESS;
+}
+>>>>>>> a6dbf22930d70bdc833656efc1b8a06700a64f90

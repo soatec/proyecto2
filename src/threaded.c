@@ -2,6 +2,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <termios.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <signal.h>
+#include <sys/mman.h>
+#include <pthread.h>
 #include "threaded.h"
 #include "utils.h"
 
