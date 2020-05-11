@@ -75,7 +75,11 @@ int client_run(cliente_t *cliente) {
               status);
       return EXIT_FAILURE;
     }
-    cliente->errores++;
+     if (bytes_recibidos < 0) {
+        cliente->errores++;
+      } else {
+        cliente->rw_cero++;
+      }
     status = pthread_mutex_unlock(&cliente->mutex_errores);
     if (status) {
       fprintf(stderr, "[Cliente] Error %d al liberar el lock de errores\n",

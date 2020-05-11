@@ -450,7 +450,7 @@ int send_get_request(int file_descriptor, char *file_location, int times) {
     if (status < 0) {
         fprintf(stderr, ("Error al enviar HTTP GET request\n"));
         close_connection(file_descriptor);
-        return response_size;
+        return -1;
     }
     if (status == 0) {
         fprintf(stderr, "El servidor se desconectó\n");
@@ -462,7 +462,7 @@ int send_get_request(int file_descriptor, char *file_location, int times) {
     if (status < 0) {
         fprintf(stderr, ("Error al recibir HTTP response\n"));
         close_connection(file_descriptor);
-        return response_size;
+        return -1;
     }
     if (status == 0) {
         fprintf(stderr, "El servidor se desconectó\n");

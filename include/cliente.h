@@ -34,6 +34,9 @@ typedef struct cliente {
   /** Cantidad de errores reportados */
   unsigned int errores;
 
+  /** Cantidad de reads/writes retornan 0 */
+  unsigned int rw_cero;
+
   /** Cantidad de bytes recibidos */
   unsigned int bytes_recibidos;
 
