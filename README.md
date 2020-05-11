@@ -83,6 +83,9 @@ ejecutando en la raíz del proyecto:
 make
 ./build/forked -r "/home/user/server_root" -p 10000
 ```
+
+En cada caso, la imagen muestra del lado izquierdo el *request* enviado y el lado derecho son las respuestas del *Web Server*.
+
 ![Alt text](docs/serverinit.png?raw=true "Title")
 
 ### Ejecutar PUT
@@ -91,18 +94,19 @@ make
 
 ### Ejecutar GET
 
-![Alt text](docs/serverinit.png?raw=true "Title")
+![Alt text](docs/get.png?raw=true "Title")
 
 ### Ejecutar HEAD
 
-![Alt text](docs/serverinit.png?raw=true "Title")
+![Alt text](docs/head.png?raw=true "Title")
 
 ### Ejecutar DELETE
 
-![Alt text](docs/serverinit.png?raw=true "Title")
+![Alt text](docs/delete.png?raw=true "Title")
 
 ## Autores
 
+- Greylin Arias Montiel.
 - Daniel Alvarado Chou.
 - Jorge Bolaños Solís.
 - Alonso Mondal Durán.
