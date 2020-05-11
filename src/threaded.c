@@ -25,6 +25,8 @@ typedef struct{
 
 int listening_socket;
 
+shared_variables_t *shared_variables;
+
 int save_global_count_bytes(int bytes_sent, shared_variables_t *shared_variables) {
     pthread_mutex_lock(&shared_variables->total_bytes_mutex_lock);
     (*shared_variables).total_bytes += bytes_sent;
@@ -35,6 +37,8 @@ int save_global_count_bytes(int bytes_sent, shared_variables_t *shared_variables
 void cleanup(int sig) {
     printf("Cleaning up connections and exiting.\n");
     tcp_connection_uninit(listening_socket);
+    free(shared_variables);
+    pthread_mutex_destroy(&shared_variables->total_bytes_mutex_lock);
     exit(EXIT_SUCCESS);
 }
 
@@ -44,13 +48,12 @@ void* process_request(void *thread_info_void){
     thread_info_t *thread_info = (thread_info_t*)thread_info_void;
     response_size = respond_to_request(thread_info->root, thread_info->file_descriptor, SERVER_NAME);
     total_data = save_global_count_bytes(response_size, thread_info->shared_variables);
-    printf("Global count of data sent out: %d bytes", total_data);
+    printf("Global count of data sent out: %d bytes\n", total_data);
     pthread_exit(NULL);
 }
 
 int execute_threaded_server(int port_int, char *root) {
     struct sockaddr_in servaddr;
-    shared_variables_t *shared_variables;
     socklen_t addr_size = sizeof(servaddr);
 
     (void) signal(SIGINT, cleanup);

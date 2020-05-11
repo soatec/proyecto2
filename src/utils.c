@@ -414,14 +414,6 @@ int tcp_connection_init(uint16_t puerto, char *direccion_ip,
 int tcp_connection_uninit(int fd) {
 int status;
 
-  // Finalizar el flujo de datos
-  status = shutdown(fd, SHUT_RDWR);
-  if (status) {
-    fprintf(stderr, "Error %d al cerrar el file"
-                    " descriptor del servidor\n", errno);
-    return -1;
-  }
-
   // Cerrar el file descriptor del servidor
   status = close(fd);
   if (status) {
