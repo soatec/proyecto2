@@ -13,30 +13,16 @@
  */
 #define BUFFER_LENGTH 8192
 
-/*
- * Parse HTTP request
- */
-http_request_t parse_request(int fd) {
-  http_request_t ret = {};
-  FILE *file_stream = fdopen(fd, "r");
+#define SERVER_NAME "Prethreaded server"
 
-  if (file_stream == NULL)
-  {
-      fprintf(stderr, "Error opening file descriptor in getMessage()\n");
-      exit(EXIT_FAILURE);
-  }
-  return ret;
-}
 
 /*
  * Rutina para atender requests
  */
 void *address_request(void *args) {
   int status;
-  long request_size;
-  char buffer[BUFFER_LENGTH];
   thread_control_t *thread_control = (thread_control_t *)args;
-  char *response = "Hola del servidor\n";
+  char *server_name = SERVER_NAME;
 
   while(thread_control->run) {
     status = pthread_mutex_lock(&thread_control->mutex);
@@ -53,32 +39,8 @@ void *address_request(void *args) {
 
     if (!thread_control->run) break;
 
-    // Recibir solicitud
-    request_size = read(thread_control->connection_fd, buffer, BUFFER_LENGTH);
-    if (request_size < 0) {
-      fprintf(stderr, "[Servidor Prethreaded] Error %d al leer un mensaje\n",
-              errno);
-    }
-
-    // TODO: Parse request
-    printf("RECEIVED MESSAGE: %s\n", buffer);
-
-    // TODO: Make response
-
-    // Enviar respuesta
-    request_size = write(thread_control->connection_fd, response,
-                         strlen(response));
-    if (request_size < 0) {
-     fprintf(stderr, "[Servidor Prethreaded] Error %d al enviar un mensaje\n",
-             errno);
-    }
-
-    // Cerrar el file descriptor de la conexión
-    status = close(thread_control->connection_fd);
-    if (status) {
-      fprintf(stderr, "[Servidor Prethreaded] Error %d al cerrar el file "
-                      "descriptor de la conexión\n", errno);
-    }
+    respond_to_request(thread_control->root_path, thread_control->connection_fd,
+                       server_name);
 
     status = pthread_mutex_unlock(&thread_control->mutex);
     if(status){
@@ -101,8 +63,9 @@ void *address_request(void *args) {
 /*
  * Iniciar servidor prethreaded
  */
-int prethreaded_server_init(uint16_t puerto,
-                            uint32_t cantidad_threads,
+int prethreaded_server_init(uint16_t                puerto,
+                            uint32_t                cantidad_threads,
+                            char                   *root_path,
                             servidor_prethreaded_t *servidor) {
   int status;
 
@@ -121,7 +84,7 @@ int prethreaded_server_init(uint16_t puerto,
     status = ENOMEM;
     fprintf(stderr, "[Servidor Prethreaded] Error %d al hacer alloc de thread"
                      " pool\n", status);
-    goto error_fd;
+    return status;
   }
 
   servidor->thread_control =
@@ -154,6 +117,9 @@ int prethreaded_server_init(uint16_t puerto,
     // Indicar al thread que debe iniciar la ejecución
     servidor->thread_control[i].run = true;
 
+    // Indicar el root path del servidor
+    servidor->thread_control[i].root_path = root_path;
+
     // Crear thread con la rutina de atención de requests
     status = pthread_create(&servidor->thread_pool[i], NULL, address_request,
                             &servidor->thread_control[i]);
@@ -173,8 +139,6 @@ error_tc:
   free(servidor->thread_control);
 error_tp:
   free(servidor->thread_pool);
-error_fd:
-  close(servidor->fd);
 
   return status;
 }
@@ -196,8 +160,7 @@ int prethreaded_server_run(servidor_prethreaded_t *servidor) {
     if (request_fd < 0) {
       fprintf(stderr, "[Servidor Prethreaded] Error %d al aceptar una "
               "conexión\n", errno);
-      status = errno;
-      goto error;
+      return status;
     }
 
     printf("[Servidor Prethreaded] Atendiendo al cliente %s\n",
@@ -213,6 +176,8 @@ int prethreaded_server_run(servidor_prethreaded_t *servidor) {
                         "thread número %d\n", status, i);
         goto error;
       }
+
+      printf("Asignando file descriptor %d al thread %d\n", request_fd, i);
 
       // Asignar el file descriptor de la conexión
       servidor->thread_control[i].connection_fd = request_fd;
@@ -231,8 +196,9 @@ int prethreaded_server_run(servidor_prethreaded_t *servidor) {
         if (status == EBUSY) continue;
         fprintf(stderr, "[Servidor Prethreaded] Error %d al liberar el lock del "
                         "thread número %d\n", status, i);
-        goto error;
+        return status;
       }
+      break;
     }
   }
 
@@ -241,7 +207,6 @@ int prethreaded_server_run(servidor_prethreaded_t *servidor) {
 error:
   free(servidor->thread_control);
   free(servidor->thread_pool);
-  close(servidor->fd);
 
   return status;
 }
@@ -257,7 +222,7 @@ int prethreaded_server_uninit(servidor_prethreaded_t *servidor) {
   servidor->run = false;
 
   status = tcp_connection_uninit(servidor->fd);
-  if (status) goto error_fd;
+  if (status) goto error_free;
 
   /* Despertar a los threads indicando que deben detenerse, destruir el cond y
      mutex de cada thread */
@@ -320,8 +285,6 @@ int prethreaded_server_uninit(servidor_prethreaded_t *servidor) {
 
   return EXIT_SUCCESS;
 
-error_fd:
-  close(servidor->fd);
 error_free:
   free(servidor->thread_control);
   free(servidor->thread_pool);

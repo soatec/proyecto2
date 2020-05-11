@@ -65,6 +65,14 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    if (threads == -1) {
+        fprintf(stderr, "-n número de threads es un parámetro obligatorio\n");
+        return EXIT_FAILURE;
+    } else if (threads < 0) {
+        fprintf(stderr, "-n número de threads debe ser positivo\n");
+        return EXIT_FAILURE;
+    }
+
     printf("\n\n  ______                                 __        __                            _______                        __      __                                            __                  __ \n");
     printf(" /      \\                               |  \\      |  \\                          |       \\                      |  \\    |  \\                                          |  \\                |  \\\n");
     printf("|  $$$$$$\\  ______    ______  __     __  \\$$  ____| $$  ______    ______        | $$$$$$$\\  ______    ______  _| $$_   | $$____    ______    ______    ______    ____| $$  ______    ____| $$\n");
@@ -75,7 +83,8 @@ int main(int argc, char *argv[]) {
     printf(" \\$$    $$ \\$$     \\| $$         \\$$$   | $$ \\$$    $$ \\$$    $$| $$            | $$      | $$       \\$$     \\  \\$$  $$| $$  | $$| $$       \\$$     \\ \\$$    $$ \\$$    $$ \\$$     \\ \\$$    $$\n");
     printf("  \\$$$$$$   \\$$$$$$$ \\$$          \\$     \\$$  \\$$$$$$$  \\$$$$$$  \\$$             \\$$       \\$$        \\$$$$$$$   \\$$$$  \\$$   \\$$ \\$$        \\$$$$$$$  \\$$$$$$$  \\$$$$$$$  \\$$$$$$$  \\$$$$$$$\n\n");
 
-    status = prethreaded_server_init((uint16_t)puerto, threads, &servidor);
+    status = prethreaded_server_init((uint16_t)puerto, threads, root,
+                                     &servidor);
     if(status) return status;
 
     printf("%s ejecutando con un máximo de %d threads con el root path %s "

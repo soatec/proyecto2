@@ -9,16 +9,17 @@
  * Rutina para solicitar archivos al servidor
  */
 void *request_file(void *args) {
-  int status;
+  int fd;
   cliente_t *cliente = (cliente_t *)args;
 
   for(int i = 0; i < cliente->ciclos; i++) {
     // Obtener file descriptor del socket
-    status = client_init(cliente);
-    if (status) continue;
+    fd = client_init(cliente);
+    if (fd < 0) continue;
 
     // Solicitar archivo
     client_run(cliente);
+    close(fd);
   }
 
   pthread_exit(NULL);

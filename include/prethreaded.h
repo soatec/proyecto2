@@ -5,55 +5,6 @@
 #include <stdbool.h>
 #include "utils.h"
 
-/**
- * Métodos HTTP
- */
-typedef enum http_method {
-
-  HTTP_METHOD_GET,
-
-  HTTP_METHOD_POST,
-
-  HTTP_METHOD_DELETE,
-
-  HTTP_METHOD_NOT_SUPPORTED,
-
-} http_method_t;
-
-/**
- * Información del request HTTP
- */
-typedef struct http_request {
-
-  /** Método HTTP */
-  enum http_method metodo;
-
-  /** URI */
-  char *uri;
-
-  /** Versión HTTP */
-  char *version;
-
-} http_request_t;
-
-/**
- * Información del response HTTP
- */
-typedef struct http_response {
-
-  /** Versión HTTP */
-  char *version;
-
-  /** Cóndigo de status */
-  uint8_t status_code;
-
-  /** Tipo del recurso */
-  char *content_type;
-
-  /** Tamaño del recurso */
-  uint32_t content_length;
-
-} http_response_t;
 
 /**
  * Información de control de threads
@@ -70,6 +21,9 @@ typedef struct thread_control {
 
   /** Señal que despierta/duerme el thread */
   pthread_cond_t signal;
+
+  /** Root path del servidor */
+  char *root_path;
 
 } thread_control_t;
 
@@ -101,13 +55,15 @@ typedef struct servidor_prethreaded {
  * @param [in]  puerto           es el número de puerto
  * @param [in]  cantidad_threads es la cantidad de threads para atender
  *                               solicitudes
+ * @param [in]  root_path        es el root path del servidor
  * @param [out] servidor         es la información del servidor
  *
  * @returns 0 si la operación es exitosa, sino el código de error
  *
  */
-int prethreaded_server_init(uint16_t puerto,
-                            uint32_t cantidad_threads,
+int prethreaded_server_init(uint16_t                puerto,
+                            uint32_t                cantidad_threads,
+                            char                   *root_path,
                             servidor_prethreaded_t *servidor);
 
 /**

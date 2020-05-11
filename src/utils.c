@@ -414,14 +414,6 @@ int tcp_connection_init(uint16_t puerto, char *direccion_ip,
 int tcp_connection_uninit(int fd) {
 int status;
 
-  // Finalizar el flujo de datos
-  status = shutdown(fd, SHUT_RDWR);
-  if (status) {
-    fprintf(stderr, "Error %d al cerrar el file"
-                    " descriptor del servidor\n", errno);
-    return -1;
-  }
-
   // Cerrar el file descriptor del servidor
   status = close(fd);
   if (status) {
@@ -513,6 +505,16 @@ int send_get_request(int file_descriptor, char *file_location, int times) {
     printf("Requested file name: %s\n", file_name);
 
     while ((bytes_read=read(file_descriptor, received_data, WRITE_BUFFER_SIZE)) > 0) {
+<<<<<<< HEAD
+=======
+        if (bytes_read < 0) {
+            fprintf(stderr, "Error en la función read. (Errno %d: %s)\n",
+                    errno, strerror(errno));
+            close_connection(file_descriptor);
+            return response_size;
+        }
+        // write(requested_file_descriptor, received_data, bytes_read);
+>>>>>>> Fix some prethreaded server issues
         response_size += bytes_read;
     }
 
