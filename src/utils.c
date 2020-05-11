@@ -177,7 +177,7 @@ int respond_to_get_and_head_request(char *root, int file_descriptor,
     int bytes_read;
     char data_to_send[WRITE_BUFFER_SIZE];
 
-    if (strncmp(requested_resource_path, ROOT, strlen(ROOT)) == 0) {
+    if (strncmp(requested_resource_path, ROOT, strlen(ROOT) + 1) == 0) {
         requested_resource_path = "/index.html";
     }
     strcpy(path, root);
@@ -245,7 +245,7 @@ int respond_to_delete_request(char *root, int file_descriptor,
     int access_response;
     int remove_response;
 
-    if (strncmp(resource_path_to_delete, ROOT, strlen(ROOT)) == 0) {
+    if (strncmp(resource_path_to_delete, ROOT, strlen(ROOT) + 1) == 0) {
         write_header(file_descriptor, 400, NULL, server_name);
     }
 
@@ -305,21 +305,22 @@ int respond_to_request(char *root, int file_descriptor, char *server_name) {
     printf("\n\nMensaje:\n%s\nFin del mensaje\n\n", message);
 
     content = strstr(message, CONTENT_DELIM) + strlen(CONTENT_DELIM);
-    content_length_str = strstr(message, CONTENT_LENGTH_TAG) + strlen(CONTENT_LENGTH_TAG) + 2;
-    content_length_str = strtok(content_length_str, "\r\n");
+    content_length_str = strstr(message, CONTENT_LENGTH_TAG);
+    if (content_length_str != NULL) {
+        content_length_str = strtok(content_length_str  + strlen(CONTENT_LENGTH_TAG) + 2, "\r\n");
+        content_length_int = atoi(content_length_str);
+        if (content_length_int != strlen(content)) {
+            write_header(file_descriptor, 413, NULL, server_name);
+            close_connection(file_descriptor);
+            return response_size;
+        }
+    }
     method_name = strtok(message, " \t\n");
     resource_path = strtok(NULL, " \t");
     http_version = strtok(NULL, " \t\n");
 
     if (strncmp(http_version, "HTTP/1.1", 8) != 0) {
         write_header(file_descriptor, 400, NULL, server_name);
-        close_connection(file_descriptor);
-        return response_size;
-    }
-
-    content_length_int = atoi(content_length_str);
-    if (content_length_int != strlen(content)) {
-        write_header(file_descriptor, 413, NULL, server_name);
         close_connection(file_descriptor);
         return response_size;
     }

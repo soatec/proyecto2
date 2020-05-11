@@ -76,13 +76,29 @@ Recibe como parámetros -m nombre_ip_maquina_servidor -p puerto-a archivo_solici
 En este ejemplo se usa el generador de *HTTP requests* online https://reqbin.com/ usando Google Chrome Version 81.0.4044.113.
 
 ### Inicializar un servidor
-Se usa el servidor forked con root `/home/server_root` en el puerto 10000, 
+Se usa el servidor forked con root `/home/user/server_root` en el puerto 10000, 
 ejecutando en la raíz del proyecto:
 
 ```
 make
 ./build/forked -r "/home/user/server_root" -p 10000
 ```
+![Alt text](docs/serverinit.png?raw=true "Title")
+
+### Ejecutar PUT
+
+![Alt text](docs/put.png?raw=true "Title")
+
+### Ejecutar GET
+
+![Alt text](docs/serverinit.png?raw=true "Title")
+
+### Ejecutar HEAD
+
+![Alt text](docs/serverinit.png?raw=true "Title")
+
+### Ejecutar DELETE
+
 ![Alt text](docs/serverinit.png?raw=true "Title")
 
 ## Autores
