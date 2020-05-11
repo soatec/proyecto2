@@ -82,7 +82,7 @@ int execute_threaded_server(int port_int, char *root) {
     (void) signal(SIGINT, cleanup);
 
     // Create listening socket
-    listening_socket = tcp_connection_init(port_int, NULL);
+    listening_socket = tcp_connection_init(port_int, NULL, true);
     if (listening_socket < 0) {
       return EXIT_FAILURE;
     }

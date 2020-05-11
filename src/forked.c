@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include <stdbool.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include <arpa/inet.h>
@@ -44,7 +43,7 @@ int init_forked_server(int port_int){
   }
 
   printf("Inicializando servidor...\n");
-  fd = tcp_connection_init(port_int, NULL);
+  fd = tcp_connection_init(port_int, NULL, true);
   if (fd < 0) {
     fprintf(stderr, "Error inicializando servidor\n");
     return -1;

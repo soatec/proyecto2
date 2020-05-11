@@ -4,7 +4,6 @@
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
-#include <stdbool.h>
 #include <sys/mman.h>
 #include <dirent.h>
 #include "forked.h"

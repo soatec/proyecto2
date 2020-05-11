@@ -1,8 +1,28 @@
 #include <stdio.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include "cliente.h"
+
+/*
+ * Rutina para solicitar archivos al servidor
+ */
+void *request_file(void *args) {
+  int status;
+  cliente_t *cliente = (cliente_t *)args;
+
+  for(int i = 0; i < cliente->ciclos; i++) {
+    // Obtener file descriptor del socket
+    status = client_init(cliente);
+    if (status) continue;
+
+    // Solicitar archivo
+    client_run(cliente);
+  }
+
+  pthread_exit(NULL);
+}
 
 int main(int argc, char *argv[]) {
   int   opt;
@@ -11,6 +31,10 @@ int main(int argc, char *argv[]) {
   int   puerto  = -1;
   int   threads = -1;
   int   ciclos  = -1;
+  int status = 0;
+  cliente_t cliente;
+  struct timeval tiempo_inicio, tiempo_final, tiempo_transcurrido;
+  pthread_t current_thread;
 
   while ((opt = getopt(argc, argv, "m:p:a:t:c:")) != -1) {
       switch (opt) {
@@ -81,9 +105,101 @@ int main(int argc, char *argv[]) {
   printf(" \\$$    $$| $$| $$ \\$$     \\| $$  | $$  \\$$  $$ \\$$     \\\n");
   printf("  \\$$$$$$  \\$$ \\$$  \\$$$$$$$ \\$$   \\$$   \\$$$$   \\$$$$$$$\n\n");
 
+  // Inicializar variables compartidas y mutexes
+  cliente.ip                 = maquina;
+  cliente.puerto             = puerto;
+  cliente.archivo            = archivo;
+  cliente.threads            = threads;
+  cliente.ciclos             = ciclos;
+  cliente.archivos_recibidos = 0;
+  cliente.errores            = 0;
+  cliente.bytes_recibidos    = 0;
+
+  status = pthread_mutex_init(&cliente.mutex_socket, NULL);
+  if(status){
+    fprintf(stderr, "[Cliente] Error %d al iniciar el mutex del"
+                     " socket\n", status);
+    return EXIT_FAILURE;
+  }
+
+
+  status = pthread_mutex_init(&cliente.mutex_errores, NULL);
+  if(status){
+    fprintf(stderr, "[Cliente] Error %d al iniciar el mutex del"
+                     " número de errores\n", status);
+    return EXIT_FAILURE;
+  }
+
+  status = pthread_mutex_init(&cliente.mutex_archivos, NULL);
+  if(status){
+    fprintf(stderr, "[Cliente] Error %d al iniciar el mutex del"
+                     " número de archivos\n", status);
+    return EXIT_FAILURE;
+  }
+
   printf("%s ejecutando %d threads que solicitan el archivo %s %d veces "
          "al servidor %s en el puerto %d\n", argv[0], threads, archivo, ciclos,
          maquina, puerto);
+
+  status = gettimeofday(&tiempo_inicio, NULL);
+  if (status < 0) {
+    fprintf(stderr, "Error %d al obtener el tiempo de inicio\n", errno);
+  }
+
+  for (int thread_cnt = 0; thread_cnt < cliente.threads; thread_cnt++) {
+    status = pthread_create(&current_thread, NULL, request_file,
+                            &cliente);
+    if(status){
+      fprintf(stderr, "[Cliente] Error %d al crear thread número %d\n",
+              status, thread_cnt);
+      continue;
+    }
+    status = pthread_join(current_thread, NULL);
+    if(status){
+      fprintf(stderr, "[Cliente] Error %d al hacer join del thread número %d\n",
+              status, thread_cnt);
+    }
+  }
+
+
+  status = gettimeofday(&tiempo_final, NULL);
+  if (status < 0) {
+    fprintf(stderr, "Error %d al obtener el tiempo de inicio\n", errno);
+  }
+
+  status = pthread_mutex_destroy(&cliente.mutex_socket);
+  if(status){
+    fprintf(stderr, "[Cliente] Error %d al destruir el mutex del"
+                     " socket\n", status);
+    return EXIT_FAILURE;
+  }
+
+  status = pthread_mutex_destroy(&cliente.mutex_errores);
+  if(status){
+    fprintf(stderr, "[Cliente] Error %d al destruir el mutex del"
+                     " número de errores\n", status);
+    return EXIT_FAILURE;
+  }
+
+  status = pthread_mutex_destroy(&cliente.mutex_archivos);
+  if(status){
+    fprintf(stderr, "[Cliente] Error %d al destruir el mutex del"
+                    " número de archivos\n", status);
+    return EXIT_FAILURE;
+  }
+
+  timersub(&tiempo_final, &tiempo_inicio, &tiempo_transcurrido);
+
+  printf("\n************************************\n");
+  printf("\nEl cliente ha terminado su ejecución\n");
+  printf("\n************************************\n\n");
+
+  printf("Tiempo tiempo_transcurrido: %ld s y %ld us\n",
+         (long int)tiempo_transcurrido.tv_sec,
+         (long int)tiempo_transcurrido.tv_usec/1000);
+  printf("Archivos recibidos: %d\n", cliente.archivos_recibidos);
+  printf("Bytes recibidos: %d\n",    cliente.bytes_recibidos);
+  printf("Errores reportados: %d\n", cliente.errores);
 
   return EXIT_SUCCESS;
 }

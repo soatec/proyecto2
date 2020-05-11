@@ -78,7 +78,7 @@ int execute_preforked_server(int puerto, char *root, int procesos) {
     (void) signal(SIGINT, cleanup);
 
     // Create listening socket
-    list_s = tcp_connection_init(puerto, NULL);
+    list_s = tcp_connection_init(puerto, NULL, true);
     if (list_s < 0) {
       return EXIT_FAILURE;
     }
