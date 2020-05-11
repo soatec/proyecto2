@@ -189,12 +189,6 @@ int respond_to_get_and_head_request(char *root, int file_descriptor,
         response_size = write_header(file_descriptor, 200, path, server_name);
         if (send_body) {
             while ((bytes_read = read(requested_file_descriptor, data_to_send, WRITE_BUFFER_SIZE)) > 0) {
-                if (bytes_read < 0) {
-                    fprintf(stderr, "Error en la función read. (Errno %d: %s)\n",
-                            errno, strerror(errno));
-                    response_size = write_header(file_descriptor, 500, NULL, server_name);
-                    return response_size;
-                }
                 response_size += write(file_descriptor, data_to_send, bytes_read);
             }
         }
@@ -202,6 +196,7 @@ int respond_to_get_and_head_request(char *root, int file_descriptor,
         printf("Archivo no encontrado\n");
         response_size = write_header(file_descriptor, 404, NULL, server_name);
     }
+    close(requested_file_descriptor);
     return response_size;
 }
 
@@ -422,7 +417,7 @@ int status;
   // Finalizar el flujo de datos
   status = shutdown(fd, SHUT_RDWR);
   if (status) {
-    fprintf(stderr, "[Servidor Prethreaded] Error %d al cerrar el file"
+    fprintf(stderr, "Error %d al cerrar el file"
                     " descriptor del servidor\n", errno);
     return -1;
   }
@@ -430,7 +425,7 @@ int status;
   // Cerrar el file descriptor del servidor
   status = close(fd);
   if (status) {
-    fprintf(stderr, "[Servidor Prethreaded] Error %d al cerrar el file"
+    fprintf(stderr, "Error %d al cerrar el file"
                     " descriptor del servidor\n", errno);
     return -1;
   }
@@ -440,7 +435,6 @@ int status;
 
 int send_get_request(int file_descriptor, char *file_location, int times) {
     int response_size = 0;
-    // int requested_file_descriptor;
     int bytes_read;
     char mesg[READ_BUFFER_SIZE];
     char received_data[WRITE_BUFFER_SIZE];
@@ -459,8 +453,6 @@ int send_get_request(int file_descriptor, char *file_location, int times) {
     sprintf(mesg, "GET %s HTTP/1.1\n", file_location);
 
     printf("HTTP Request:\n%sFin del request\n", mesg);
-
-    // TODO: LOOP
 
     status = write(file_descriptor, mesg, strlen(mesg));
     if (status < 0) {
@@ -520,15 +512,7 @@ int send_get_request(int file_descriptor, char *file_location, int times) {
 
     printf("Requested file name: %s\n", file_name);
 
-    // requested_file_descriptor = open(file_name, O_CREAT | O_RDWR);
-
     while ((bytes_read=read(file_descriptor, received_data, WRITE_BUFFER_SIZE)) > 0) {
-        if (bytes_read < 0) {
-            fprintf(stderr, "Error en la función read. (Errno %d: %s)\n",
-                    errno, strerror(errno));
-            close_connection(file_descriptor);
-        }
-        // write(requested_file_descriptor, received_data, bytes_read);
         response_size += bytes_read;
     }
 

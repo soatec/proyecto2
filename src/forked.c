@@ -3,7 +3,6 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/socket.h>
-#include <netdb.h>
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -92,6 +91,7 @@ int execute_forked_server(int socket_file_descriptor, char *root){
         return errno;
     }
 
+    int status;
     while (*run) {
         printf("Esperando solicitud...\n");
         accept_response = accept(socket_file_descriptor, (struct sockaddr*)&client_address, &client_address_length);
@@ -118,6 +118,11 @@ int execute_forked_server(int socket_file_descriptor, char *root){
                     strerror(errno));
             respond_service_unavailable(socket_file_descriptor, SERVER_NAME);
             continue;
+        }
+        status = close(accept_response);
+        if (status < 0) {
+            fprintf(stderr, "Error en la función close. (Errno %d: %s)\n",
+                    errno, strerror(errno));
         }
         printf("Se creó el proceso con PID: %d\n", fork_response);
     }

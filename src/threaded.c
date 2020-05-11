@@ -6,16 +6,12 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <signal.h>
-#include <sys/mman.h>
 #include <pthread.h>
 #include "threaded.h"
 #include "utils.h"
 
-#define SERVER_BACKLOG 100
 #define SERVER_NAME "ThreadedServer"
 
-
-// Structure to hold variables that will be placed in shared memory
 typedef struct {
     pthread_mutex_t total_bytes_mutex_lock;
     int             total_bytes;
@@ -36,31 +32,10 @@ int save_global_count_bytes(int bytes_sent, shared_variables_t *shared_variables
     return (*shared_variables).total_bytes;
 }
 
-// clean up listening socket on ctrl-c
-void cleanup(int sig)
-{
+void cleanup(int sig) {
     printf("Cleaning up connections and exiting.\n");
-
-    // Close listening socket
     tcp_connection_uninit(listening_socket);
-
-    // exit with success
     exit(EXIT_SUCCESS);
-}
-
-int my_get_char(void)
-{
-    int ch;
-    struct termios oldt, newt;
-
-    tcgetattr(STDIN_FILENO, &oldt);
-    newt = oldt;
-    newt.c_lflag &= ~(ICANON | ECHO);
-    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-    ch = getchar();
-    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
-
-    return ch;
 }
 
 void* process_request(void *thread_info_void){
@@ -78,10 +53,8 @@ int execute_threaded_server(int port_int, char *root) {
     shared_variables_t *shared_variables;
     socklen_t addr_size = sizeof(servaddr);
 
-    // set up signal handler for ctrl-c
     (void) signal(SIGINT, cleanup);
 
-    // Create listening socket
     listening_socket = tcp_connection_init(port_int, NULL, true);
     if (listening_socket < 0) {
       return EXIT_FAILURE;

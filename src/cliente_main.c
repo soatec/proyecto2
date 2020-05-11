@@ -194,7 +194,7 @@ int main(int argc, char *argv[]) {
   printf("\nEl cliente ha terminado su ejecución\n");
   printf("\n************************************\n\n");
 
-  printf("Tiempo tiempo_transcurrido: %ld s y %ld us\n",
+  printf("Tiempo tiempo_transcurrido: %ld s y %ld ms\n",
          (long int)tiempo_transcurrido.tv_sec,
          (long int)tiempo_transcurrido.tv_usec/1000);
   printf("Archivos recibidos: %d\n", cliente.archivos_recibidos);
