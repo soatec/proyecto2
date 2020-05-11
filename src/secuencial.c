@@ -20,7 +20,7 @@ void sigint_handler(int sig_num) {
 }
 
 int init_server(int port){
-    socket_file_descriptor = tcp_connection_init(port, NULL);
+    socket_file_descriptor = tcp_connection_init(port, NULL, true);
     if (socket_file_descriptor < 0) {
       fprintf(stderr, "Error inicializando servidor\n");
       return -1;

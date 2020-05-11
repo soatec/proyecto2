@@ -107,7 +107,7 @@ int prethreaded_server_init(uint16_t puerto,
   int status;
 
   // Inicializar conexión TCP
-  servidor->fd = tcp_connection_init(puerto, NULL);
+  servidor->fd = tcp_connection_init(puerto, NULL, true);
   if (servidor->fd == -1) {
     fprintf(stderr, "[Servidor Prethreaded] Error al iniciar conexión TPC\n");
     return EIO;

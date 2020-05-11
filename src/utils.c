@@ -349,15 +349,23 @@ int respond_service_unavailable(int file_descriptor, char *server_name) {
     return write_header(file_descriptor, 503, NULL, server_name);
 }
 
-int tcp_connection_init(uint16_t puerto, char *direccion_ip) {
+int tcp_connection_init(uint16_t puerto, char *direccion_ip,
+                        bool servidor) {
   int status;
   int  fd;
   struct sockaddr_in address;
+  int reuse_addr = 1;
 
   // Crear socket TCP (IPv4)
   fd = socket(AF_INET, SOCK_STREAM, 0);
   if (fd < 0) {
     fprintf(stderr, "Error %d al crear socket TCP\n", errno);
+    return -1;
+  }
+
+  if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse_addr, sizeof(int)) < 0) {
+    fprintf(stderr, "Error %d al activar el flag reuse_addr del socket TCP\n",
+    errno);
     return -1;
   }
 
@@ -378,20 +386,30 @@ int tcp_connection_init(uint16_t puerto, char *direccion_ip) {
      para evitar bugs */
   memset(&address.sin_zero, 0, sizeof(address.sin_zero));
 
-  // Asignar dirección IP al socket
-  status = bind(fd, (struct sockaddr *)&address, sizeof(address));
-  if (status) {
-    fprintf(stderr, "[Servidor Prethreaded] Error %d al asignar una dirección"
-            " IPv4 al socket TCP\n", errno);
-    return -1;
-  }
+  if (servidor) {
+    // Asignar dirección IP al socket
+    status = bind(fd, (struct sockaddr *)&address, sizeof(address));
+    if (status) {
+      fprintf(stderr, "Error %d al asignar una dirección"
+              " IPv4 al socket TCP\n", errno);
+      return -1;
+    }
 
-  // Esperar conexiones de clientes
-  status = listen(fd, CONNECTIONS_QUEUE_LEN);
-  if (status) {
-    fprintf(stderr, "[Servidor Prethreaded] Error %d al esperar conexiones en"
-                    " el socket TCP\n", errno);
-    return -1;
+    // Esperar conexiones de clientes
+    status = listen(fd, CONNECTIONS_QUEUE_LEN);
+    if (status) {
+      fprintf(stderr, "Error %d al esperar conexiones en"
+                      " el socket TCP\n", errno);
+      return -1;
+    }
+  } else {
+    // Conectar al sevidor
+    status = connect(fd, (struct sockaddr *)&address, sizeof(address));
+    if (status) {
+      fprintf(stderr, "Error %d al tratar de contactar al servidor"
+              " IPv4 al socket TCP\n", errno);
+      return -1;
+    }
   }
 
   return fd;
@@ -399,6 +417,14 @@ int tcp_connection_init(uint16_t puerto, char *direccion_ip) {
 
 int tcp_connection_uninit(int fd) {
 int status;
+
+  // Finalizar el flujo de datos
+  status = shutdown(fd, SHUT_RDWR);
+  if (status) {
+    fprintf(stderr, "[Servidor Prethreaded] Error %d al cerrar el file"
+                    " descriptor del servidor\n", errno);
+    return -1;
+  }
 
   // Cerrar el file descriptor del servidor
   status = close(fd);
@@ -409,4 +435,103 @@ int status;
   }
 
   return 0;
+}
+
+int send_get_request(int file_descriptor, char *file_location, int times) {
+    int response_size = 0;
+    // int requested_file_descriptor;
+    int bytes_read;
+    char mesg[READ_BUFFER_SIZE];
+    char received_data[WRITE_BUFFER_SIZE];
+    int status;
+    char *http_header;
+    char *version;
+    char *status_code;
+    char *status_phrase;
+    char *file_name;
+
+    memset((void*)mesg, (int)'\0', READ_BUFFER_SIZE);
+
+    /* A request line has three parts, separated by spaces: a method name,
+       the local path of the requested resource, and the version of HTTP
+       being used */
+    sprintf(mesg, "GET %s HTTP/1.1\n", file_location);
+
+    printf("HTTP Request:\n%sFin del request\n", mesg);
+
+    // TODO: LOOP
+
+    status = write(file_descriptor, mesg, strlen(mesg));
+    if (status < 0) {
+        fprintf(stderr, ("Error al enviar HTTP GET request\n"));
+        close_connection(file_descriptor);
+        return response_size;
+    }
+    if (status == 0) {
+        fprintf(stderr, "El servidor se desconectó\n");
+        close_connection(file_descriptor);
+        return response_size;
+    }
+
+    status = read(file_descriptor, mesg, READ_BUFFER_SIZE);
+    if (status < 0) {
+        fprintf(stderr, ("Error al recibir HTTP response\n"));
+        close_connection(file_descriptor);
+        return response_size;
+    }
+    if (status == 0) {
+        fprintf(stderr, "El servidor se desconectó\n");
+        close_connection(file_descriptor);
+        return response_size;
+    }
+
+    /* An HTTP response has 3 parts, separated with spaces: HTTP version,
+      response status code, reason phrase describing the status code */
+    version       = strtok(mesg, " \t\n");
+    status_code   = strtok(NULL, " \t");
+    status_phrase = strtok(NULL, " \t\n");
+
+    if (strncmp(version, "HTTP/1.1", 8) != 0) {
+        fprintf(stderr, "Unsupported version:%s\n", version);
+        close_connection(file_descriptor);
+        return response_size;
+    }
+
+    if (strncmp(status_code, "200", 3) != 0) {
+        fprintf(stderr, "HTTP request failed with code:%s(%s)\n", status_code,
+                status_phrase);
+        close_connection(file_descriptor);
+        return response_size;
+    }
+
+    printf("HTTP response:\n%s %s %s\n", version, status_code, status_phrase);
+    while((http_header = strtok(NULL, "\t\n")) != NULL) {
+      printf("%s\n", http_header);
+    }
+    printf("Fin del response\n\n");
+
+    file_name = strrchr(file_location, '/');
+    if (file_name != NULL) {
+      file_name+=1;
+    } else {
+      file_name = file_location;
+    }
+
+    printf("Requested file name: %s\n", file_name);
+
+    // requested_file_descriptor = open(file_name, O_CREAT | O_RDWR);
+
+    while ((bytes_read=read(file_descriptor, received_data, WRITE_BUFFER_SIZE)) > 0) {
+        if (bytes_read < 0) {
+            fprintf(stderr, "Error en la función read. (Errno %d: %s)\n",
+                    errno, strerror(errno));
+            close_connection(file_descriptor);
+        }
+        // write(requested_file_descriptor, received_data, bytes_read);
+        response_size += bytes_read;
+    }
+
+    close_connection(file_descriptor);
+    printf("Process with PID %d, received %d bytes\n", getpid(), response_size);
+    return response_size;
 }
