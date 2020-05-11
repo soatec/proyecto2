@@ -2,7 +2,54 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
 #include "cliente.h"
+
+#define BUFFSIZE	256
+
+int client(char *address, int port)
+{
+	int client_socket;
+	
+
+	// connect to an address
+	struct sockaddr_in remote_address;
+	
+	memset(&remote_address,0,sizeof(remote_address));
+	remote_address.sin_family = AF_INET;
+	remote_address.sin_port = htons(port);
+	remote_address.sin_addr.s_addr = inet_addr(address);
+	//inet_aton(address, &remote_address.sin_addr.s_addr);
+
+	if ((client_socket = socket(AF_INET, SOCK_STREAM, 0))<0){
+		perror("socket client_socket");
+		return 1;
+	}
+	
+	
+	if (connect(client_socket, (struct sockaddr *) &remote_address, sizeof(remote_address))< 0)
+	{
+		perror("connect client_socket");
+		return 1;
+	}
+
+	printf("connected to server\n");
+
+	char request[] = "GET / HTTP/1.1\r\n\r\n";
+	char response[4096];
+
+	send(client_socket, request, sizeof(request), 0);
+	recv(client_socket, &response, sizeof(response), 0);
+
+	printf("response from the server: %s\n", response);
+	close(client_socket);
+
+	return 0;
+}
 
 int main(int argc, char *argv[]) {
   int   opt;
@@ -84,6 +131,8 @@ int main(int argc, char *argv[]) {
   printf("%s ejecutando %d threads que solicitan el archivo %s %d veces "
          "al servidor %s en el puerto %d\n", argv[0], threads, archivo, ciclos,
          maquina, puerto);
+         
+  client(maquina,puerto);
 
   return EXIT_SUCCESS;
 }
