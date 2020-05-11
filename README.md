@@ -1,9 +1,7 @@
 # Proyecto 2: Diseño de un *Web Server* Simplificado
 
 El propósito de este proyecto es contrastar varias posibilidades de diseño de un servidor en un ambiente distribuido.
-La solución del problema es la implementación de 1 cliente y 5 versiones diferentes de *Web Server*: secuencial, forked, threaded, 
-pre-forked y pre-threaded. Cada uno se ejecuta de manera independiente de los otros e implementa de forma básica los métodos
-HEAD, GET, PUT y DELETE.
+La solución del problema es la implementación de 1 cliente y 5 versiones diferentes de *Web Server*: secuencial, forked, threaded, pre-forked y pre-threaded. Cada uno se ejecuta de manera independiente de los otros e implementa de forma básica los métodos HEAD, GET, PUT y DELETE. Para finalizar cualquier servidor de manera controlada es necesario presionar Ctrl + C.
 
 ### Estructura y compilación del proyecto
 - include: Contiene los archivos .h de los 5 *Web Server*, el cliente y utils.
