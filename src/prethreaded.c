@@ -84,7 +84,7 @@ int prethreaded_server_init(uint16_t                puerto,
     status = ENOMEM;
     fprintf(stderr, "[Servidor Prethreaded] Error %d al hacer alloc de thread"
                      " pool\n", status);
-    return status;
+    goto error_fd;
   }
 
   servidor->thread_control =
@@ -139,6 +139,8 @@ error_tc:
   free(servidor->thread_control);
 error_tp:
   free(servidor->thread_pool);
+error_fd:
+  close(servidor->fd);
 
   return status;
 }
@@ -149,10 +151,9 @@ error_tp:
 int prethreaded_server_run(servidor_prethreaded_t *servidor) {
   int request_fd;
   int status;
+  int inicio = 0;
   struct sockaddr_in client_address;
   socklen_t address_len = sizeof(client_address);
-
-  // TODO: Hacer loop para aceptar conexiones
 
   while(servidor->run) {
     request_fd = accept(servidor->fd, (struct sockaddr *)&client_address,
@@ -166,7 +167,7 @@ int prethreaded_server_run(servidor_prethreaded_t *servidor) {
     printf("[Servidor Prethreaded] Atendiendo al cliente %s\n",
            inet_ntoa(client_address.sin_addr));
 
-    for(int i = 0; i < servidor->thread_quantity; i++) {
+    for(int i = inicio; i < servidor->thread_quantity; i++) {
 
       // Si obtenemos el lock de un thread, significa que está desocupado
       status = pthread_mutex_trylock(&servidor->thread_control[i].mutex);
@@ -178,6 +179,8 @@ int prethreaded_server_run(servidor_prethreaded_t *servidor) {
       }
 
       printf("Asignando file descriptor %d al thread %d\n", request_fd, i);
+
+      inicio = (inicio + 1) % servidor->thread_quantity;
 
       // Asignar el file descriptor de la conexión
       servidor->thread_control[i].connection_fd = request_fd;
@@ -205,6 +208,7 @@ int prethreaded_server_run(servidor_prethreaded_t *servidor) {
   return EXIT_SUCCESS;
 
 error:
+  close(request_fd);
   free(servidor->thread_control);
   free(servidor->thread_pool);
 
@@ -222,7 +226,7 @@ int prethreaded_server_uninit(servidor_prethreaded_t *servidor) {
   servidor->run = false;
 
   status = tcp_connection_uninit(servidor->fd);
-  if (status) goto error_free;
+  if (status) goto error_fd;
 
   /* Despertar a los threads indicando que deben detenerse, destruir el cond y
      mutex de cada thread */
@@ -285,6 +289,8 @@ int prethreaded_server_uninit(servidor_prethreaded_t *servidor) {
 
   return EXIT_SUCCESS;
 
+error_fd:
+  close(servidor->fd);
 error_free:
   free(servidor->thread_control);
   free(servidor->thread_pool);
