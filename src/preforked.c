@@ -16,74 +16,45 @@
 #include "utils.h"
 
 #define SERVER_NAME "PreforkedServer"
-#define SERVER_BACKLOG 100
 
 
-// Structure to hold variables that will be placed in shared memory
 typedef struct {
     pthread_mutex_t mutexlock;
     pthread_mutex_t accept_connection_lock;
-    int totalbytes;
+    int total_bytes;
 } shared_variables_t;
 
-int list_s;                   // listening socket
+int listening_socket;
 
-
-int save_global_count_bytes(int bytes_sent, shared_variables_t *mempointer)
-{
+int save_global_count_bytes(int bytes_sent, shared_variables_t *mempointer) {
     pthread_mutex_lock(&(*mempointer).mutexlock);
-    (*mempointer).totalbytes += bytes_sent;
+    (*mempointer).total_bytes += bytes_sent;
     pthread_mutex_unlock(&(*mempointer).mutexlock);
-    // Return the new byte count
-    return (*mempointer).totalbytes;
+    return (*mempointer).total_bytes;
 }
 
-// clean up listening socket on ctrl-c
 void cleanup(int sig) {
     printf("PID:%i Cleaning up connections and exiting.\n", getpid());
-
-    // Close listening socket
-    tcp_connection_uninit(list_s);
-
-    // Close the shared memory we used
+    tcp_connection_uninit(listening_socket);
     shm_unlink("/sharedmem");
-
-    // exit with success
     exit(EXIT_SUCCESS);
 }
 
-int my_get_char(void) {
-    int ch;
-    struct termios oldt, newt;
-    tcgetattr(STDIN_FILENO, &oldt);
-    newt = oldt;
-    newt.c_lflag &= ~(ICANON | ECHO);
-    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-    ch = getchar();
-    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
-    return ch;
-}
 
 int execute_preforked_server(int puerto, char *root, int procesos) {
     int response_size;
     int conn_s;
     int totaldata;
     int children = 0;
-    int childref[procesos - 1];
     int sharedmem;
     struct sockaddr_in servaddr;
     pid_t pid;
 
-    // set up signal handler for ctrl-c
     (void) signal(SIGINT, cleanup);
-
-    // Create listening socket
-    list_s = tcp_connection_init(puerto, NULL, true);
-    if (list_s < 0) {
+    listening_socket = tcp_connection_init(puerto, NULL, true);
+    if (listening_socket < 0) {
       return EXIT_FAILURE;
     }
-
-    // Close shared memory
     shm_unlink("/sharedmem");
 
     if ((sharedmem = shm_open("/sharedmem", O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR)) == -1) {
@@ -100,29 +71,12 @@ int execute_preforked_server(int puerto, char *root, int procesos) {
     }
     pthread_mutex_init(&(*mempointer).mutexlock, NULL);
     pthread_mutex_init(&(*mempointer).accept_connection_lock, NULL);
-    (*mempointer).totalbytes = 0;
+    (*mempointer).total_bytes = 0;
     socklen_t addr_size = sizeof(servaddr);
 
     while (1) {
-        if (children == procesos) {
-            printf("Press any key to close server.\n");
-            my_get_char();
-            printf("Server Closing...\n");
-            int i;
-            for (i = 0; i < children; i++) {
-                kill(childref[i], 2);
-            }
-            wait(NULL);
-            totaldata = save_global_count_bytes(0, mempointer);
-            fprintf(stderr,"Total bytes sent %d\n", totaldata);
-            fprintf(stderr, "Parent ");
-            cleanup(2);
-            break;
-        }
-
         if (children < procesos)  {
             pid = fork();
-            childref[children] = pid;
             children++;
         }
 
@@ -134,7 +88,7 @@ int execute_preforked_server(int puerto, char *root, int procesos) {
         if (pid == 0) {
             while (1) {
                 pthread_mutex_lock(&(*mempointer).accept_connection_lock);
-                conn_s = accept(list_s, (struct sockaddr *) &servaddr, &addr_size);
+                conn_s = accept(listening_socket, (struct sockaddr *) &servaddr, &addr_size);
                 pthread_mutex_unlock(&(*mempointer).accept_connection_lock);
 
                 if (conn_s == -1) {
