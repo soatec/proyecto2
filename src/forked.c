@@ -113,17 +113,19 @@ int execute_forked_server(int socket_file_descriptor, char *root){
             exit(EXIT_SUCCESS);
         }
 
+        status = close(accept_response);
+        if (status < 0) {
+            fprintf(stderr, "Error en la función close. (Errno %d: %s)\n",
+                    errno, strerror(errno));
+        }
+
         if (fork_response < 0) {
             fprintf(stderr, "Error ejecutando la función fork. (Errno. %s)\n",
                     strerror(errno));
             respond_service_unavailable(socket_file_descriptor, SERVER_NAME);
             continue;
         }
-        status = close(accept_response);
-        if (status < 0) {
-            fprintf(stderr, "Error en la función close. (Errno %d: %s)\n",
-                    errno, strerror(errno));
-        }
+
         printf("Se creó el proceso con PID: %d\n", fork_response);
     }
 
