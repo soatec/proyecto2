@@ -114,6 +114,7 @@ int main(int argc, char *argv[]) {
   cliente.ciclos             = ciclos;
   cliente.archivos_recibidos = 0;
   cliente.errores            = 0;
+  cliente.rw_cero            = 0;
   cliente.bytes_recibidos    = 0;
 
   status = pthread_mutex_init(&cliente.mutex_socket, NULL);
@@ -201,6 +202,7 @@ int main(int argc, char *argv[]) {
   printf("Archivos recibidos: %d\n", cliente.archivos_recibidos);
   printf("Bytes recibidos: %d\n",    cliente.bytes_recibidos);
   printf("Errores reportados: %d\n", cliente.errores);
+  printf("Read/write retornan 0: %d\n", cliente.rw_cero);
 
   return EXIT_SUCCESS;
 }
